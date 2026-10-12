@@ -401,19 +401,25 @@ def _translation_pool(language_id):
     return pool
 
 
-@main_bp.route("/learn/quiz")
-def learn_quiz():
-    """Serve a single match-the-word question for Mimo's quiz."""
-    language = None
+def _language_from_request():
+    """Resolve the ?language= / ?language_id= argument used by learner routes."""
     name = request.args.get("language")
     if name:
         language = Language.query.filter(
             db.func.lower(Language.name) == name.strip().lower()
         ).first()
-    if language is None:
-        lang_id = request.args.get("language_id", type=int)
-        if lang_id is not None:
-            language = db.session.get(Language, lang_id)
+        if language:
+            return language
+    lang_id = request.args.get("language_id", type=int)
+    if lang_id is not None:
+        return db.session.get(Language, lang_id)
+    return None
+
+
+@main_bp.route("/learn/quiz")
+def learn_quiz():
+    """Serve a single match-the-word question for Mimo's quiz."""
+    language = _language_from_request()
     if language is None:
         return jsonify({"available": False, "reason": "unknown_language"}), 404
 
@@ -457,6 +463,50 @@ def learn_quiz():
                 "verified": correct["verified"],
             },
             "pool_size": len(entries),
+        }
+    )
+
+
+@main_bp.route("/learn/word")
+def learn_word():
+    """Serve one consented word/tip for Mimo's chat, in the chosen language."""
+    language = _language_from_request()
+    if language is None:
+        return jsonify({"available": False, "reason": "unknown_language"}), 404
+
+    category = (request.args.get("category") or "").strip().lower()
+    exclude = {s for s in (request.args.get("exclude") or "").split(",") if s}
+    entries = [
+        value
+        for value in _translation_pool(language.id).values()
+        if value["text"].strip()
+        and (not category or value["term"].category == category)
+        and value["term"].slug not in exclude
+    ]
+    if not entries:
+        return jsonify(
+            {
+                "available": False,
+                "language": language.name,
+                "reason": "not_enough_words",
+            }
+        )
+
+    choice = random.choice(entries)
+    term = choice["term"]
+    return jsonify(
+        {
+            "available": True,
+            "language": language.name,
+            "word": {
+                "term": term.english_name,
+                "slug": term.slug,
+                "category": term.category,
+                "definition": term.english_definition or "",
+                "swahili_name": term.swahili_name,
+                "translation": choice["text"],
+                "verified": choice["verified"],
+            },
         }
     )
 

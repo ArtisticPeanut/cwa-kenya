@@ -4,13 +4,17 @@
 
   var API = "/api/v1";
   var bot = document.getElementById("lmBot");
-  var speech = document.getElementById("lmSpeech");
   var langBox = document.getElementById("lmLanguages");
   var statsBox = document.getElementById("lmStats");
   var wordBox = document.getElementById("lmWord");
   var leadersBox = document.getElementById("lmLeaders");
   var barsBox = document.getElementById("lmBars");
   var quizBox = document.getElementById("lmQuiz");
+  var quizSection = document.getElementById("lmQuizSection");
+  var chatLog = document.getElementById("lmChatLog");
+  var chatReplies = document.getElementById("lmChatReplies");
+  var chatForm = document.getElementById("lmChatForm");
+  var chatInput = document.getElementById("lmChatInput");
 
   var state = { totals: null, languages: [], selected: null,
     quiz: { correct: 0, total: 0, streak: 0 } };
@@ -18,24 +22,33 @@
   var happyTimer = null;
   var sadTimer = null;
 
-  // ---------------------------------------------------------------- Mimo
-  function mimoSay(text, opts) {
-    opts = opts || {};
-    if (!speech) return;
-    speech.textContent = text;
-    if (bot) {
-      bot.classList.add("is-talking");
-      bot.classList.remove("is-happy");
-      clearTimeout(talkTimer);
-      talkTimer = setTimeout(function () {
-        bot.classList.remove("is-talking");
-        if (opts.happy !== false) {
-          bot.classList.add("is-happy");
-          clearTimeout(happyTimer);
-          happyTimer = setTimeout(function () { bot.classList.remove("is-happy"); }, 2200);
-        }
-      }, Math.min(2600, 420 + text.length * 28));
-    }
+  // ------------------------------------------------------------- chat engine
+  var sayQueue = [];
+  var saying = false;
+
+  function scrollChat() {
+    if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  function addBubble(who, text) {
+    if (!chatLog) return null;
+    var bubble = el('<div class="lm-msg ' + who + '"></div>');
+    bubble.textContent = text;
+    chatLog.appendChild(bubble);
+    scrollChat();
+    return bubble;
+  }
+
+  function showTyping() {
+    if (!chatLog) return null;
+    var typing = el('<div class="lm-msg mimo typing"><span></span><span></span><span></span></div>');
+    chatLog.appendChild(typing);
+    scrollChat();
+    return typing;
+  }
+
+  function removeTyping(node) {
+    if (node && node.parentNode) node.parentNode.removeChild(node);
   }
 
   function mimoFeel(mood) {
@@ -52,6 +65,55 @@
     }
   }
 
+  function deliver(item) {
+    addBubble("mimo", item.text);
+    if (bot) {
+      bot.classList.add("is-talking");
+      if (item.mood === "sad") {
+        mimoFeel("sad");
+      } else {
+        mimoFeel("happy");
+      }
+      clearTimeout(talkTimer);
+      talkTimer = setTimeout(function () {
+        bot.classList.remove("is-talking");
+      }, Math.min(2600, 420 + item.text.length * 28));
+    }
+    if (typeof item.after === "function") item.after();
+  }
+
+  function pump() {
+    if (saying || !sayQueue.length) return;
+    saying = true;
+    var item = sayQueue.shift();
+    var typing = showTyping();
+    var delay = Math.min(1700, 480 + item.text.length * 20);
+    setTimeout(function () {
+      removeTyping(typing);
+      deliver(item);
+      saying = false;
+      setTimeout(pump, 170);
+    }, delay);
+  }
+
+  function mimoSay(text, opts) {
+    opts = opts || {};
+    sayQueue.push({ text: text, mood: opts.mood, after: opts.after });
+    pump();
+  }
+
+  function setReplies(list) {
+    if (!chatReplies) return;
+    chatReplies.innerHTML = "";
+    (list || []).forEach(function (item) {
+      var chip = el('<button type="button" class="lm-reply"></button>');
+      chip.textContent = item.label;
+      chip.addEventListener("click", item.onClick);
+      chatReplies.appendChild(chip);
+    });
+  }
+
+  // ---------------------------------------------------------------- Mimo eyes
   function blink() {
     var eyes = document.querySelectorAll(".lm-eye");
     eyes.forEach(function (e) { e.classList.add("lm-blink"); });
@@ -106,6 +168,19 @@
     requestAnimationFrame(frame);
   }
 
+  function findLanguage(text) {
+    var t = String(text || "").toLowerCase();
+    for (var i = 0; i < state.languages.length; i++) {
+      var lang = state.languages[i];
+      var name = String(lang.name || "").toLowerCase();
+      if (name && t.indexOf(name) !== -1) return lang;
+      var native = String(lang.native_name || "").toLowerCase();
+      if (native && t.indexOf(native) !== -1) return lang;
+      if (name && t.length >= 4 && name.indexOf(t) !== -1) return lang;
+    }
+    return null;
+  }
+
   // ------------------------------------------------------------- render
   function renderStats(totals) {
     if (!statsBox) return;
@@ -132,16 +207,16 @@
     (withData.length ? withData : languages).forEach(function (lang) {
       var pill = el('<button type="button" class="lm-pill">' +
         esc(lang.name) + ' <small>' + lang.submissions + " samples</small></button>");
-      pill.addEventListener("click", function () { selectLanguage(lang, pill); });
+      pill.dataset.lang = lang.name;
+      pill.addEventListener("click", function () { chooseLanguage(lang); });
       langBox.appendChild(pill);
     });
-    if (langBox.firstElementChild) {
-      var first = langBox.firstElementChild;
-      selectLanguage(
-        (withData.length ? withData : languages)[0],
-        first
-      );
-    }
+  }
+
+  function highlightPills(lang) {
+    document.querySelectorAll(".lm-pill").forEach(function (p) {
+      p.classList.toggle("is-active", p.dataset.lang === lang.name);
+    });
   }
 
   function renderLeaders(top) {
@@ -188,64 +263,37 @@
     });
   }
 
-  function selectLanguage(lang, pill) {
-    state.selected = lang;
-    document.querySelectorAll(".lm-pill").forEach(function (p) {
-      p.classList.toggle("is-active", p === pill);
-    });
-    mimoSay("Sasa tunaanza " + lang.name + "! I'm learning " + lang.name +
-      " with " + lang.contributors + " friend" + (lang.contributors === 1 ? "" : "s") +
-      " and " + lang.submissions + " words so far.");
-    loadWord(lang);
-    state.quiz = { correct: 0, total: 0, streak: 0 };
-    startQuiz(lang);
-  }
-
+  // ---------------------------------------------------- word of the moment
   function loadWord(lang) {
     if (!wordBox) return;
     wordBox.innerHTML = '<p class="lm-loading">Mimo is fetching a ' + esc(lang.name) + " word…</p>";
-    fetch(API + "/translations/phishing?language=" + encodeURIComponent(lang.name))
-      .then(function (r) { return r.ok ? r.json() : { translations: [] }; })
+    fetch("/learn/word?language=" + encodeURIComponent(lang.name) + "&category=glossary")
+      .then(function (r) { return r.ok ? r.json() : { available: false }; })
       .then(function (data) {
-        if (data.translations && data.translations.length) {
-          var t = data.translations[Math.floor(Math.random() * data.translations.length)];
-          showWord(t, true);
+        if (!data.available) {
+          wordBox.innerHTML =
+            '<div class="lm-word"><span class="lm-term">' + esc(lang.name) + "</span>" +
+            '<div class="lm-trans">Be the first to teach Mimo a word! 🌱</div>' +
+            '<div class="lm-def">No words for this language yet — ' +
+            lang.submissions + " community samples are waiting for review.</div>" +
+            '<a class="lm-badge" href="/tasks">Help verify one →</a></div>';
           return;
         }
-        // no verified word yet — show a lively invitation instead
-        return fetch(API + "/translations?language=" + encodeURIComponent(lang.name))
-          .then(function (r) { return r.ok ? r.json() : { translations: [] }; })
-          .then(function (d2) {
-            if (d2.translations && d2.translations.length) {
-              showWord(d2.translations[0], true);
-            } else {
-              wordBox.innerHTML =
-                '<div class="lm-word"><span class="lm-term">' + esc(lang.name) + "</span>" +
-                '<div class="lm-trans">Be the first to teach Mimo a word! 🌱</div>' +
-                '<div class="lm-def">No verified translation yet — ' + lang.submissions +
-                " community samples are waiting for review.</div>" +
-                '<a class="lm-badge" href="/tasks/phishing">Help verify one →</a></div>';
-              mimoSay("I don't know this word in " + lang.name +
-                " yet. Will you teach me?");
-            }
-          });
+        showWord(data.word, lang);
       })
       .catch(function () {
         wordBox.innerHTML = '<p class="lm-loading">Mimo had trouble reaching the word. Try another language?</p>';
       });
   }
 
-  function showWord(t, verified) {
+  function showWord(w, lang) {
     wordBox.innerHTML =
       '<div class="lm-word">' +
-        '<span class="lm-term">' + esc(t.term_name || t.term) + " · " + esc(t.language) +
-        (t.dialect ? " (" + esc(t.dialect) + ")" : "") + "</span>" +
-        '<div class="lm-trans">' + esc(t.translation) + "</div>" +
-        '<div class="lm-def">' + esc(t.definition || t.context || "A cybersecurity word to know.") + "</div>" +
-        '<span class="lm-badge">' + (verified ? "✓ community verified" : "✓ verified") + "</span>" +
+        '<span class="lm-term">' + esc(w.term) + " · " + esc(lang.name) + "</span>" +
+        '<div class="lm-trans">' + esc(w.translation) + "</div>" +
+        '<div class="lm-def">' + esc(w.definition || "A cybersecurity word to know.") + "</div>" +
+        '<span class="lm-badge">' + (w.verified ? "✓ community verified" : "🌱 community sample") + "</span>" +
       "</div>";
-    mimoSay("Here's a word we can trust in " + t.language + ": “" + t.translation +
-      "”. Pretty cool, right?");
   }
 
   // ---------------------------------------------------------------- quiz
@@ -283,7 +331,7 @@
       '<div class="lm-quiz-head"><span class="lm-chips">' + chips() + "</span></div>" +
       '<div class="lm-question">Which one means <span class="lm-qterm">' + esc(q.term) +
         "</span> in " + esc(data.language) + "?</div>" +
-      '<div class="lm-qdef">' + esc(q.definition) + "</div>" +
+      '<div class="lm-qdef">' + esc(q.definition || "") + "</div>" +
       '<div class="lm-options" id="lmOptions"></div>' +
       '<div class="lm-feedback" id="lmFeedback"></div>' +
       '<button type="button" class="btn btn-primary lm-next" id="lmNext" ' +
@@ -319,8 +367,7 @@
       state.quiz.streak = 0;
       fb.innerHTML = "💡 Correct answer: <strong>" + esc(q.options[q.answer_index]) + "</strong>";
       mimoSay('Pole! The right one is "' + q.options[q.answer_index] + '". Now you know it!',
-        { happy: false });
-      mimoFeel("sad");
+        { mood: "sad" });
     }
     var head = quizBox.querySelector(".lm-chips");
     if (head) head.innerHTML = chips();
@@ -328,7 +375,158 @@
     if (next) { next.style.display = "inline-block"; next.focus(); }
   }
 
+  // ------------------------------------------------------- chat conversation
+  function languageReplies() {
+    var withData = state.languages.filter(function (l) { return l.submissions > 0; });
+    var langs = (withData.length ? withData : state.languages).slice(0, 6);
+    return langs.map(function (lang) {
+      return {
+        label: lang.name + " · " + lang.submissions,
+        onClick: function () {
+          addBubble("user", lang.name);
+          chooseLanguage(lang);
+        }
+      };
+    });
+  }
+
+  function askLanguage() {
+    mimoSay("Which language would you like to learn in? 🌍", {
+      after: function () { setReplies(languageReplies()); }
+    });
+  }
+
+  function chooseLanguage(lang) {
+    state.selected = lang;
+    highlightPills(lang);
+    mimoSay("Sasa tunaanza " + lang.name + "! 🎉 I'm learning with " + lang.contributors +
+      " friend" + (lang.contributors === 1 ? "" : "s") + " and " + lang.submissions +
+      " words so far.");
+    state.quiz = { correct: 0, total: 0, streak: 0 };
+    loadWord(lang);
+    startQuiz(lang);
+    sendAwarenessTip(lang);
+  }
+
+  function learnReplies(lang) {
+    return [
+      { label: "Teach me a word", onClick: function () {
+          addBubble("user", "Teach me a word"); sendWord(lang); } },
+      { label: "Quiz me", onClick: function () {
+          addBubble("user", "Quiz me"); playQuiz(lang); } },
+      { label: "Another safety tip", onClick: function () {
+          addBubble("user", "Another safety tip"); sendAwarenessTip(lang); } },
+      { label: "Change language", onClick: function () {
+          addBubble("user", "Change language"); askLanguage(); } }
+    ];
+  }
+
+  function startReplies() {
+    return [
+      { label: "Teach me a word", onClick: function () {
+          addBubble("user", "Teach me a word"); requireLang(sendWord); } },
+      { label: "Quiz me", onClick: function () {
+          addBubble("user", "Quiz me"); requireLang(playQuiz); } },
+      { label: "Safety tip", onClick: function () {
+          addBubble("user", "Safety tip"); requireLang(sendAwarenessTip); } },
+      { label: "Choose language", onClick: function () { askLanguage(); } }
+    ];
+  }
+
+  function requireLang(action) {
+    if (state.selected) { action(state.selected); return; }
+    askLanguage();
+  }
+
+  function sendAwarenessTip(lang) {
+    fetch("/learn/word?language=" + encodeURIComponent(lang.name) + "&category=message")
+      .then(function (r) { return r.ok ? r.json() : { available: false }; })
+      .then(function (data) {
+        if (!data.available) {
+          mimoSay("I don't have a safety tip in " + lang.name + " yet. Help us add one! 🌱");
+        } else {
+          var w = data.word;
+          var text = "🛡️ " + w.translation;
+          if (w.term && String(w.term).toLowerCase() !== String(w.translation).toLowerCase()) {
+            text += "\n\n(“" + w.term + "”)";
+          }
+          if (!w.verified) text += "\n🌱 community sample — help us verify it";
+          mimoSay(text);
+        }
+        setReplies(learnReplies(lang));
+      })
+      .catch(function () {
+        mimoSay("Hmm, I couldn't reach my notes just now. Try again in a moment.");
+      });
+  }
+
+  function sendWord(lang) {
+    fetch("/learn/word?language=" + encodeURIComponent(lang.name) + "&category=glossary")
+      .then(function (r) { return r.ok ? r.json() : { available: false }; })
+      .then(function (data) {
+        if (!data.available) {
+          mimoSay("I don't know a word in " + lang.name + " yet — will you teach me one? 🌱");
+          return;
+        }
+        var w = data.word;
+        var text = "📖 “" + w.term + "” in " + lang.name + " is “" + w.translation + "”.";
+        if (w.definition) text += "\n" + w.definition;
+        if (!w.verified) text += "\n🌱 community sample";
+        mimoSay(text);
+        showWord(w, lang);
+      });
+  }
+
+  function playQuiz(lang) {
+    startQuiz(lang);
+    mimoSay("Here comes your question — good luck! 🎯");
+    if (quizSection && quizSection.scrollIntoView) {
+      quizSection.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
+  function helpReply() {
+    mimoSay("I can share a 🛡️ safety tip, 📖 teach you a word, or 🎯 quiz you — " +
+      "in any Kenyan language. What would you like?", {
+      after: function () { setReplies(startReplies()); }
+    });
+  }
+
+  function handleUserText(raw) {
+    var text = String(raw || "").trim();
+    if (!text) return;
+    addBubble("user", text);
+    setReplies([]);
+    var t = text.toLowerCase();
+
+    var lang = findLanguage(t);
+    if (lang) { chooseLanguage(lang); return; }
+    if (/(quiz|test|game|play|question)/.test(t)) { requireLang(playQuiz); return; }
+    if (/(tip|advice|awareness|safe|danger|scam|fraud)/.test(t)) { requireLang(sendAwarenessTip); return; }
+    if (/(word|teach|learn|translate|vocab|term)/.test(t)) { requireLang(sendWord); return; }
+    if (/(language|change|switch|other)/.test(t)) { askLanguage(); return; }
+    if (/(help|what can|options|how do)/.test(t)) { helpReply(); return; }
+    if (/(hi|hello|hey|karibu|sasa|habari|jambo|niaje)/.test(t)) {
+      mimoSay("Karibu! 😊 " + (state.selected
+        ? "Ready to keep learning " + state.selected.name + "?"
+        : "Which language shall we learn in?"), {
+        after: function () { setReplies(state.selected ? learnReplies(state.selected) : startReplies()); }
+      });
+      return;
+    }
+    if (/(thank|asante|thanks)/.test(t)) { mimoSay("Karibu sana! 💜"); return; }
+
+    mimoSay("I'm still learning 😅 — try “teach me a word”, “quiz me”, or tell me your language.");
+    setReplies(startReplies());
+  }
+
   // --------------------------------------------------------------- boot
+  function introSequence() {
+    mimoSay("Karibu! I'm Mimo 🤖 your online-safety buddy.");
+    mimoSay("Pick a language, then ask me for a 🛡️ safety tip, 📖 a word, or a 🎯 quiz.");
+    askLanguage();
+  }
+
   function boot() {
     scheduleBlink();
     document.addEventListener("mousemove", function (e) {
@@ -338,7 +536,14 @@
       if (e.touches && e.touches[0]) trackEyes(e.touches[0].clientX, e.touches[0].clientY);
     }, { passive: true });
 
-    mimoSay("Karibu! I'm Mimo. Let me show you what our community has built…");
+    if (chatForm) {
+      chatForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var value = chatInput ? chatInput.value : "";
+        if (chatInput) chatInput.value = "";
+        handleUserText(value);
+      });
+    }
 
     fetch(API + "/stats")
       .then(function (r) { return r.json(); })
@@ -349,14 +554,12 @@
         renderLanguages(state.languages);
         renderLeaders(data.top_contributors);
         renderBars(state.languages.filter(function (l) { return l.submissions > 0; }));
-        var t = data.totals;
-        mimoSay("Wow! " + t.languages_with_data + " language communities have shared " +
-          t.submissions.toLocaleString() + " words and " + t.assessments +
-          " peer reviews. Pick a language to dive in!");
+        introSequence();
       })
       .catch(function () {
         if (statsBox) statsBox.innerHTML = '<span class="lm-loading">Mimo could not reach the API.</span>';
         if (langBox) langBox.innerHTML = '<span class="lm-loading">Try refreshing the page.</span>';
+        introSequence();
       });
   }
 

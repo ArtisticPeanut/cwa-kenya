@@ -22,10 +22,24 @@
     </div>
     <div class="lm-welcome">
       <span class="lm-eyebrow">👋 Hi, I'm Mimo!</span>
-      <h1>Learn to stay safe online — in the language you love.</h1>
-      <p>I'm a little cybersecurity guide for Kenya. Pick a language below and I'll show you
-         what our community is building together, one word at a time.</p>
-      <div class="lm-bubble" id="lmSpeech" role="status" aria-live="polite">Karibu! Let's explore together…</div>
+      <h1>Talk to Mimo — learn to stay safe online.</h1>
+      <p>Ask me anything. Pick your language and I'll share cybersecurity tips, teach you
+         words, and play a quick quiz with you.</p>
+
+      <div class="lm-chat" id="lmChat">
+        <div class="lm-chat-head">
+          <span class="lm-avatar lg">M</span>
+          <span class="lm-chat-id"><strong>Mimo</strong><small>online · your safety buddy</small></span>
+          <span class="lm-online" title="online"></span>
+        </div>
+        <div class="lm-chat-log" id="lmChatLog" aria-live="polite"></div>
+        <div class="lm-chat-replies" id="lmChatReplies"></div>
+        <form class="lm-chat-form" id="lmChatForm" autocomplete="off">
+          <input class="lm-chat-input" id="lmChatInput" type="text"
+                 placeholder="Talk to Mimo… try “quiz me” or “teach me a word”">
+          <button class="btn btn-primary" type="submit">Send</button>
+        </form>
+      </div>
     </div>
   </section>
 
@@ -44,11 +58,11 @@
     </div>
   </section>
 
-  <section class="lm-section">
+  <section class="lm-section" id="lmQuizSection">
     <h2>3 · Mimo's word quiz</h2>
     <p class="lm-hint">Match the cybersecurity term to its translation. Mimo is watching! 👀</p>
     <div class="lm-card lm-quiz" id="lmQuiz">
-      <p class="lm-loading">Loading a question…</p>
+      <p class="lm-loading">Choose a language above (or in the chat) and Mimo will quiz you! 🎯</p>
     </div>
   </section>
 

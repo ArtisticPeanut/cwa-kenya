@@ -46,3 +46,34 @@ def test_learn_quiz_builds_question_from_consented_samples(app, client, contribu
 
 def test_learn_quiz_unknown_language(client):
     assert client.get("/learn/quiz?language=Klingon").status_code == 404
+
+
+def test_learn_word_serves_consented_sample(app, client, contributor):
+    from app.extensions import db
+    from app.models import (
+        CATEGORY_MESSAGE,
+        Language,
+        STATUS_CANDIDATE,
+        Submission,
+        Term,
+    )
+
+    lang = Language.query.filter_by(name="Kikuyu").first()
+    glossary_term = Term.query.filter_by(category="glossary", slug="phishing").first()
+    db.session.add(Submission(
+        term_id=glossary_term.id, language_id=lang.id, user_id=contributor.id,
+        text="test-kikuyu-phishing", status=STATUS_CANDIDATE, consent_public=True,
+    ))
+    db.session.commit()
+
+    data = client.get("/learn/word?language=Kikuyu&category=glossary").get_json()
+    assert data["available"] is True
+    assert data["word"]["translation"] == "test-kikuyu-phishing"
+    assert data["word"]["verified"] is False
+    assert data["word"]["category"] == "glossary"
+
+    # no message samples in this language yet -> graceful "not enough words"
+    messages = client.get("/learn/word?language=Kikuyu&category=" + CATEGORY_MESSAGE)
+    assert messages.get_json()["available"] is False
+
+    assert client.get("/learn/word?language=Klingon").status_code == 404
