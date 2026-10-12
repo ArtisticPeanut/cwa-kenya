@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}My profile · {{ app_short_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>My profile</h1>
+    <p class="lead">Update how you appear to the community and your language preferences.</p>
+  </div>
+  <a class="btn btn-ghost" href="{{ url_for('main.my_contributions') }}">View my contributions</a>
+</div>
+<div class="card" style="max-width:680px;">
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="form-row">
+      {{ form.display_name.label }}
+      {{ form.display_name() }}
+      {% for e in form.display_name.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+    </div>
+    <div class="form-grid">
+      <div class="form-row">{{ form.county_id.label }}{{ form.county_id() }}</div>
+      <div class="form-row">{{ form.preferred_language_id.label }}{{ form.preferred_language_id(data_language_select="1") }}</div>
+      <div class="form-row">{{ form.preferred_dialect_id.label }}{{ form.preferred_dialect_id(data_dialect_select="1") }}</div>
+    </div>
+    {{ form.submit(class_="btn btn-primary", style="margin-top:1rem;") }}
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Admin · {{ app_short_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Reviewer dashboard</h1>
+    <p class="lead">Oversee community verification, approve canonical translations and manage the platform.</p>
+  </div>
+  <div class="pill-list">
+    <a class="pill" href="{{ url_for('admin.review_queue') }}">Review queue</a>
+    <a class="pill" href="{{ url_for('admin.canonical_list') }}">Canonical</a>
+    <a class="pill" href="{{ url_for('admin.terms') }}">Terms</a>
+    {% if current_user.is_admin %}
+      <a class="pill" href="{{ url_for('admin.users') }}">Users</a>
+      <a class="pill" href="{{ url_for('admin.data') }}">Data</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid grid-4">
+  <div class="card stat"><span class="num">{{ stats.submissions }}</span><span class="lbl">Submissions</span></div>
+  <div class="card stat"><span class="num">{{ stats.candidates }}</span><span class="lbl">Candidates</span></div>
+  <div class="card stat"><span class="num">{{ stats.needs_review }}</span><span class="lbl">Needs review</span></div>
+  <div class="card stat"><span class="num">{{ stats.approved_canonicals }}</span><span class="lbl">Verified translations</span></div>
+  <div class="card stat"><span class="num">{{ stats.disputed }}</span><span class="lbl">Disputed</span></div>
+  <div class="card stat"><span class="num">{{ stats.contributors }}</span><span class="lbl">Registered contributors</span></div>
+  <div class="card stat"><span class="num">{{ stats.seed_contributors }}</span><span class="lbl">Imported contributors</span></div>
+  <div class="card stat"><span class="num">{{ stats.reviews }}</span><span class="lbl">Review decisions</span></div>
+</div>
+
+<div class="card" style="margin-top:1.2rem;">
+  <h2 style="margin-top:0;">Recent review decisions</h2>
+  {% if recent_reviews %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>When</th><th>Reviewer</th><th>Action</th><th>Term</th><th>Note</th></tr></thead>
+    <tbody>
+      {% for r in recent_reviews %}
+      <tr>
+        <td class="small">{{ r.created_at|datetime }}</td>
+        <td class="small">{{ r.reviewer.display_name if r.reviewer else '—' }}</td>
+        <td><span class="badge">{{ r.action }}</span></td>
+        <td class="small">{{ r.submission.term.english_name }}</td>
+        <td class="small muted">{{ r.note or ''|truncate(60) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="muted">No review decisions yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

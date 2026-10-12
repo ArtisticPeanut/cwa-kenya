@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Learn with Mimo · {{ app_short_name }}{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/learn.css') }}">
+{% endblock %}
+{% block content %}
+<div class="lm-page">
+
+  <section class="lm-hero">
+    <div class="lm-bot-wrap">
+      <div class="lm-bot" id="lmBot" aria-hidden="true">
+        <div class="lm-antenna"><span class="lm-antenna-dot"></span></div>
+        <div class="lm-face">
+          <div class="lm-cheeks"><span></span><span></span></div>
+          <div class="lm-eyes">
+            <div class="lm-eye"><span class="lm-pupil" data-pupil></span></div>
+            <div class="lm-eye"><span class="lm-pupil" data-pupil></span></div>
+          </div>
+          <div class="lm-mouth"></div>
+        </div>
+      </div>
+    </div>
+    <div class="lm-welcome">
+      <span class="lm-eyebrow">👋 Hi, I'm Mimo!</span>
+      <h1>Learn to stay safe online — in the language you love.</h1>
+      <p>I'm a little cybersecurity guide for Kenya. Pick a language below and I'll show you
+         what our community is building together, one word at a time.</p>
+      <div class="lm-bubble" id="lmSpeech" role="status" aria-live="polite">Karibu! Let's explore together…</div>
+    </div>
+  </section>
+
+  <section class="lm-section">
+    <h2>1 · Choose a language</h2>
+    <p class="lm-hint">These are the communities already learning with us. Tap one to meet its words.</p>
+    <div class="lm-pills" id="lmLanguages">
+      <span class="lm-loading">Waking Mimo up…</span>
+    </div>
+  </section>
+
+  <section class="lm-section">
+    <h2>2 · How our community is learning</h2>
+    <div class="lm-stats" id="lmStats">
+      <span class="lm-loading">Counting contributions…</span>
+    </div>
+  </section>
+
+  <section class="lm-section">
+    <h2>3 · Mimo's word quiz</h2>
+    <p class="lm-hint">Match the cybersecurity term to its translation. Mimo is watching! 👀</p>
+    <div class="lm-card lm-quiz" id="lmQuiz">
+      <p class="lm-loading">Loading a question…</p>
+    </div>
+  </section>
+
+  <section class="lm-grid">
+    <div class="lm-card">
+      <h3>✨ Word of the moment</h3>
+      <div class="lm-word-stage" id="lmWord">
+        <p class="lm-loading">Pick a language and Mimo will find a word for you…</p>
+      </div>
+    </div>
+
+    <div class="lm-card">
+      <h3>🏅 Learners to celebrate</h3>
+      <ol class="lm-leaders" id="lmLeaders">
+        <li class="lm-loading">Loading our community…</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="lm-card" style="margin-top:1.2rem;">
+    <h3>📚 Language learning progress</h3>
+    <p class="lm-hint">How far each community has come — from first samples to verified words.</p>
+    <div class="lm-langbars" id="lmBars">
+      <span class="lm-loading">Drawing progress…</span>
+    </div>
+  </section>
+
+  <section class="lm-card lm-cta">
+    <h3>Ready to teach Mimo a new word? 🌍</h3>
+    <p class="lm-hint">Every translation helps someone understand a warning before it's too late.</p>
+    <a class="btn btn-primary" href="{{ url_for('main.select_language') }}">Start contributing</a>
+    <a class="btn btn-ghost" href="{{ url_for('main.browse') }}">Browse the glossary</a>
+  </section>
+
+</div>
+{% endblock %}
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/learn.js') }}" defer></script>
+{% endblock %}

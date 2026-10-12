@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Join · {{ app_short_name }}{% endblock %}
+{% block content %}
+<div class="card" style="max-width:640px;margin:1rem auto;">
+  <h1>Become a contributor</h1>
+  <p class="muted">Help make cybersecurity understandable in the language people speak.</p>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="form-grid">
+      <div class="form-row">
+        {{ form.display_name.label }}
+        {{ form.display_name() }}
+        {% for e in form.display_name.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-row">
+        {{ form.email.label }}
+        {{ form.email() }}
+        {% for e in form.email.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-row">
+        {{ form.password.label }}
+        {{ form.password() }}
+        {% for e in form.password.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-row">
+        {{ form.confirm.label }}
+        {{ form.confirm() }}
+        {% for e in form.confirm.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+      </div>
+    </div>
+    <fieldset style="margin-top:1rem;">
+      <legend>Where are you from?</legend>
+      <p class="small muted" style="margin-top:0;">County information only helps suggest relevant languages. It never determines the language you may choose.</p>
+      <div class="form-grid">
+        <div class="form-row">{{ form.county_id.label }}{{ form.county_id() }}</div>
+        <div class="form-row">{{ form.preferred_language_id.label }}{{ form.preferred_language_id() }}</div>
+        <div class="form-row">{{ form.preferred_dialect_id.label }}{{ form.preferred_dialect_id() }}</div>
+      </div>
+    </fieldset>
+    <label class="checkbox">{{ form.consent() }} {{ form.consent.label.text }}</label>
+    {{ form.submit(class_="btn btn-primary btn-block", style="margin-top:1rem;") }}
+  </form>
+</div>
+{% endblock %}

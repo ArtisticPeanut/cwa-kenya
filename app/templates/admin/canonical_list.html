@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Canonical translations · {{ app_short_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Canonical translations</h1>
+    <p class="lead">Approved, recommended translations with their revision history.</p>
+  </div>
+</div>
+
+<form class="card" method="get" style="margin-bottom:1rem;">
+  <div class="form-grid">
+    <div class="form-row">
+      <label for="language_id">Language</label>
+      <select name="language_id" id="language_id">
+        <option value="">All</option>
+        {% for l in languages %}<option value="{{ l.id }}" {% if language_id == l.id %}selected{% endif %}>{{ l.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-row">
+      <label for="status">Status</label>
+      <select name="status" id="status">
+        <option value="">All</option>
+        {% for value, label in status_choices %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-row" style="align-self:end;"><button class="btn btn-primary" type="submit">Filter</button></div>
+  </div>
+</form>
+
+{% if canonicals %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Term</th><th>Language</th><th>Dialect</th><th>Translation</th><th>Status</th><th>Rev</th><th></th></tr></thead>
+  <tbody>
+    {% for c in canonicals %}
+    <tr>
+      <td>{{ c.term.english_name }}</td>
+      <td>{{ c.language.name }}</td>
+      <td>{{ c.dialect.name if c.dialect else '—' }}</td>
+      <td class="small">{{ c.text|truncate(70) }}</td>
+      <td><span class="badge badge-{{ c.status }}">{{ c.status.replace('_',' ') }}</span></td>
+      <td>{{ c.revision_no }}</td>
+      <td><a class="btn btn-sm btn-ghost" href="{{ url_for('admin.canonical_detail', canonical_id=c.id) }}">Manage</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card"><p class="muted" style="margin:0;">No canonical translations match this filter.</p></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}My contributions · {{ app_short_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>My contributions</h1>
+    <p class="lead">{{ current_user.display_name }} · <span class="badge badge-tier">{{ rank.tier_label }}</span> · reputation {{ rank.reputation }}</p>
+  </div>
+  <a class="btn btn-ghost" href="{{ url_for('auth.profile') }}">Edit profile</a>
+</div>
+
+<div class="grid grid-4" style="margin-bottom:1.2rem;">
+  <div class="card stat"><span class="num">{{ rank.metrics.submissions }}</span><span class="lbl">Submissions</span></div>
+  <div class="card stat"><span class="num">{{ rank.metrics.approved }}</span><span class="lbl">Approved</span></div>
+  <div class="card stat"><span class="num">{{ rank.metrics.reviews }}</span><span class="lbl">Reviews done</span></div>
+  <div class="card stat"><span class="num">{{ rank.metrics.quality_points }}</span><span class="lbl">Quality points</span></div>
+</div>
+
+<div class="split">
+  <div>
+    <h2>My submissions</h2>
+    {% if submissions %}
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Term</th><th>Language</th><th>Translation</th><th>Support</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for s in submissions %}
+        <tr>
+          <td><a href="{{ url_for('main.task_detail', slug=s.term.slug) }}">{{ s.term.english_name }}</a></td>
+          <td>{{ s.language.name }}{% if s.dialect %} · {{ s.dialect.name }}{% endif %}</td>
+          <td class="small">{{ s.text|truncate(90) }}</td>
+          <td>{{ s.support_count }} / {{ s.vote_count }}</td>
+          <td><span class="badge badge-{{ s.status }}">{{ status_labels[s.status] }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p class="muted">You have not submitted any translations yet. <a href="{{ url_for('main.tasks') }}">Start translating</a>.</p>
+    {% endif %}
+  </div>
+
+  <aside>
+    <div class="card">
+      <h3 style="margin-top:0;">Milestones</h3>
+      <ul style="list-style:none;padding:0;margin:0;">
+        {% for item in milestones %}
+        <li style="padding:.5rem 0;border-bottom:1px solid var(--line);">
+          <strong>{% if item.earned %}✔{% else %}○{% endif %} {{ item.milestone.name }}</strong>
+          <p class="small muted" style="margin:.15rem 0 0;">{{ item.milestone.description }}</p>
+          {% if item.achieved_at %}<p class="small muted" style="margin:.15rem 0 0;">Earned {{ item.achieved_at|date }}</p>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </aside>
+</div>
+{% endblock %}

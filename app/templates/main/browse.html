@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Glossary · {{ app_short_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Cybersecurity glossary</h1>
+    <p class="lead">Verified, community-reviewed translations. Use the filters to focus on a category or language.</p>
+  </div>
+</div>
+
+<form class="card" method="get" style="margin-bottom:1rem;">
+  <div class="form-grid">
+    <div class="form-row">
+      <label for="category">Category</label>
+      <select name="category" id="category">
+        <option value="">All</option>
+        <option value="glossary" {% if category == 'glossary' %}selected{% endif %}>Glossary terms</option>
+        <option value="message" {% if category == 'message' %}selected{% endif %}>Awareness messages</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label for="language_id">Language</label>
+      <select name="language_id" id="language_id">
+        <option value="">All languages</option>
+        {% for l in languages %}<option value="{{ l.id }}" {% if language and language.id == l.id %}selected{% endif %}>{{ l.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-row" style="align-self:end;">
+      <button class="btn btn-primary" type="submit">Apply filters</button>
+    </div>
+  </div>
+</form>
+
+<div class="grid grid-2">
+  {% for row in rows %}
+  <div class="card">
+    <h3 style="margin-bottom:.2rem;"><a href="{{ url_for('main.term_public', slug=row.term.slug) }}">{{ row.term.english_name }}</a></h3>
+    <span class="badge">{{ category_labels[row.term.category] }}</span>
+    <p class="small muted" style="margin:.5rem 0;">{{ row.term.english_definition }}</p>
+    {% if row.canonicals %}
+      {% for c in row.canonicals %}
+        <div style="border-top:1px solid var(--line);padding-top:.5rem;margin-top:.5rem;">
+          <strong>{{ c.language.name }}{% if c.dialect %} · {{ c.dialect.name }}{% endif %}:</strong>
+          <span>{{ c.text }}</span>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="small muted">No verified translation yet. <a href="{{ url_for('main.task_detail', slug=row.term.slug) }}">Contribute one</a>.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

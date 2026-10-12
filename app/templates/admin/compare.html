@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Review: {{ term.english_name }} · {{ app_short_name }}{% endblock %}
+{% block content %}
+<p class="small"><a href="{{ url_for('admin.review_queue') }}">← Back to review queue</a></p>
+
+<div class="page-head">
+  <div>
+    <h1>{{ term.english_name }} · {{ language.name }}{% if dialect %} · {{ dialect.name }}{% endif %}</h1>
+    <p class="lead">
+      Community status:
+      {% set s = scope.state %}
+      <span class="badge badge-{{ s }}">{{ scope.label }}</span>
+    </p>
+  </div>
+</div>
+
+<div class="reference card">
+  <h3 style="margin-top:0;">Reference meaning</h3>
+  <p><strong>EN:</strong> {{ term.english_definition }}</p>
+  {% if term.swahili_definition %}<p class="muted"><strong>SW:</strong> {{ term.swahili_definition }}</p>{% endif %}
+</div>
+
+{% if canonical %}
+<div class="card" style="margin-top:1rem;border-color:var(--green);">
+  <span class="badge badge-approved">Currently canonical · revision {{ canonical.revision_no }}</span>
+  <p style="font-size:1.1rem;margin:.5rem 0 .2rem;">{{ canonical.text }}</p>
+  <p class="small muted" style="margin:0;">Approved {{ canonical.approved_at|datetime }}. Approving another candidate will replace it and preserve history.</p>
+</div>
+{% endif %}
+
+<h2 style="margin-top:1.4rem;">Candidates ({{ ranked|length }})</h2>
+{% for item in ranked %}
+  {% set sub = item.submission %}
+  {% set stats = item.stats %}
+  <div class="candidate {% if item.is_leader %}leader{% endif %}" style="margin-bottom:1rem;">
+    <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+      <div class="text">{{ sub.text }}</div>
+      <div>
+        {% if item.is_leader %}<span class="badge badge-reached">Leading</span>{% endif %}
+        <span class="badge badge-{{ sub.status }}">{{ status_labels[sub.status] }}</span>
+      </div>
+    </div>
+    {% if sub.usage_note %}<p class="small" style="margin:.5rem 0 0;"><strong>Usage:</strong> {{ sub.usage_note }}</p>{% endif %}
+    {% if sub.example %}<p class="small muted" style="margin:.3rem 0 0;"><strong>Example:</strong> {{ sub.example }}</p>{% endif %}
+    <p class="small muted" style="margin:.4rem 0;">By {{ sub.user.display_name if sub.user else '—' }} · {{ sub.created_at|date }}</p>
+
+    <div class="vote-bar" style="margin-bottom:.7rem;">
+      <div class="meter"><span style="width: {{ stats.ratio|pct }};"></span></div>
+      <span class="ratio">{{ stats.support }} support · {{ stats.oppose }} dispute · {{ stats.ratio|pct }} agreement</span>
+    </div>
+
+    <form method="post" action="{{ url_for('admin.approve', submission_id=sub.id) }}" class="form-grid" style="border-top:1px solid var(--line);padding-top:.7rem;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-row">
+        <label>Definition to publish (optional)</label>
+        <textarea name="definition" rows="2">{{ sub.usage_note or '' }}</textarea>
+      </div>
+      <div class="form-row">
+        <label>Context / usage notes (optional)</label>
+        <textarea name="context" rows="2">{{ sub.example or '' }}</textarea>
+      </div>
+      <div class="form-row" style="grid-column:1 / -1;">
+        <label>Reviewer note (recorded in history)</label>
+        <input type="text" name="note" placeholder="e.g. Verified with Meru Imenti speakers; cybersecurity meaning preserved.">
+      </div>
+      <div style="grid-column:1 / -1;display:flex;gap:.5rem;flex-wrap:wrap;">
+        <button class="btn btn-primary" type="submit">Approve as canonical</button>
+      </div>
+    </form>
+
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem;">
+      <form method="post" action="{{ url_for('admin.decide', submission_id=sub.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="request_revision">
+        <button class="btn btn-sm btn-ghost" type="submit">Request revision</button>
+      </form>
+      <form method="post" action="{{ url_for('admin.decide', submission_id=sub.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="flag">
+        <button class="btn btn-sm btn-ghost" type="submit">Flag as misleading</button>
+      </form>
+      <form method="post" action="{{ url_for('admin.decide', submission_id=sub.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="reject">
+        <button class="btn btn-sm btn-danger" type="submit">Reject</button>
+      </form>
+    </div>
+
+    <details style="margin-top:.6rem;">
+      <summary class="small muted" style="cursor:pointer;">Reclassify language / dialect</summary>
+      <form method="post" action="{{ url_for('admin.reclassify', submission_id=sub.id) }}" class="form-grid" style="margin-top:.5rem;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-row">
+          <label>Language</label>
+          <select name="language_id">
+            {% for l in languages %}<option value="{{ l.id }}" {% if l.id == sub.language_id %}selected{% endif %}>{{ l.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Dialect / community</label>
+          <select name="dialect_id">
+            <option value="0">— None —</option>
+            {% for d in dialects %}<option value="{{ d.id }}" {% if d.id == sub.dialect_id %}selected{% endif %}>{{ d.name }} ({{ d.language.name }})</option>{% endfor %}
+          </select>
+        </div>
+        <div style="align-self:end;"><button class="btn btn-sm btn-ghost" type="submit">Save</button></div>
+      </form>
+    </details>
+  </div>
+{% else %}
+  <p class="muted">No candidate submissions in this scope yet.</p>
+{% endfor %}
+{% endblock %}

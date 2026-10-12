@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Terms · {{ app_short_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Cybersecurity terms &amp; messages</h1>
+    <p class="lead">The glossary that contributors translate.</p>
+  </div>
+  {% if current_user.is_admin %}<a class="btn btn-primary" href="{{ url_for('admin.term_new') }}">New term</a>{% endif %}
+</div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>#</th><th>English name</th><th>Category</th><th>Submissions</th><th>Verified</th><th></th></tr></thead>
+  <tbody>
+    {% for t in terms %}
+    <tr>
+      <td>{{ t.sort_order }}</td>
+      <td><a href="{{ url_for('main.term_public', slug=t.slug) }}">{{ t.english_name }}</a></td>
+      <td><span class="badge">{{ category_labels[t.category] }}</span></td>
+      <td>{{ t.submissions|length }}</td>
+      <td>{{ t.canonicals|selectattr('status','equalto','approved')|list|length }}</td>
+      <td>{% if current_user.is_admin %}<a class="btn btn-sm btn-ghost" href="{{ url_for('admin.term_edit', term_id=t.id) }}">Edit</a>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit term' if term else 'New term' }} · {{ app_short_name }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ 'Edit term' if term else 'New term' }}</h1></div></div>
+<div class="card" style="max-width:720px;">
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="form-grid">
+      <div class="form-row">
+        {{ form.english_name.label }}{{ form.english_name() }}
+        {% for e in form.english_name.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+      </div>
+      <div class="form-row">{{ form.category.label }}{{ form.category() }}</div>
+    </div>
+    <div class="form-row">
+      {{ form.english_definition.label }}{{ form.english_definition(rows="3") }}
+      {% for e in form.english_definition.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+    </div>
+    <div class="form-row">{{ form.swahili_name.label }}{{ form.swahili_name() }}</div>
+    <div class="form-row">{{ form.swahili_definition.label }}{{ form.swahili_definition(rows="3") }}</div>
+    {{ form.submit(class_="btn btn-primary", style="margin-top:1rem;") }}
+    <a class="btn btn-ghost" href="{{ url_for('admin.terms') }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Translation tasks · {{ app_short_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Translation tasks</h1>
+    {% if language %}
+      <p class="lead">
+        Working in <strong>{{ language.name }}</strong>{% if dialect %} · <strong>{{ dialect.name }}</strong> dialect{% endif %}.
+        <a href="{{ url_for('main.select_language') }}">Change language</a> ·
+        <a href="{{ url_for('main.clear_language') }}">Clear</a>
+      </p>
+    {% else %}
+      <p class="lead">Select a language to see the terms you can contribute to. <a href="{{ url_for('main.select_language') }}">Choose a language</a>.</p>
+    {% endif %}
+  </div>
+  {% if language %}
+  <div style="min-width:220px;">
+    <p class="small muted" style="margin:0 0 .3rem;">{{ done }} of {{ total }} terms have a verified translation</p>
+    <div class="progress"><span style="width: {{ (done / total * 100) if total else 0 }}%;"></span></div>
+  </div>
+  {% endif %}
+</div>
+
+{% if language %}
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th>Term</th>
+      <th>Category</th>
+      <th>Candidates</th>
+      <th>Community status</th>
+      <th>Verified translation</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td><a href="{{ url_for('main.task_detail', slug=row.term.slug) }}">{{ row.term.english_name }}</a></td>
+      <td><span class="badge">{{ category_labels[row.term.category] }}</span></td>
+      <td>{{ row.candidates }}</td>
+      <td>
+        {% if row.consensus %}
+          <span class="badge badge-{{ row.consensus }}">{{ {'reached':'Consensus reached','ambiguous':'Competing views','insufficient':'Needs more votes','empty':'No candidates'}[row.consensus] }}</span>
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
+      <td>{% if row.canonical %}<span class="badge badge-approved">Verified</span>{% else %}<span class="muted small">Not yet</span>{% endif %}</td>
+      <td class="nowrap">
+        <a class="btn btn-sm btn-primary" href="{{ url_for('main.task_detail', slug=row.term.slug) }}">
+          {% if row.canonical %}View{% else %}Translate{% endif %}
+        </a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card">
+  <h3 style="margin-top:0;">How it works</h3>
+  <ol>
+    <li>Choose the language (and dialect) you understand best.</li>
+    <li>Read the cybersecurity term and its explanation in English and Kiswahili.</li>
+    <li>Select an existing translation or propose your own, with context and examples.</li>
+    <li>Assess other people's translations; the community's agreement guides review.</li>
+  </ol>
+  <a class="btn btn-primary" href="{{ url_for('main.select_language') }}">Choose a language to begin</a>
+</div>
+{% endif %}
+{% endblock %}

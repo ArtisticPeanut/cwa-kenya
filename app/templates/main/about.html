@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}About · {{ app_short_name }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>About the project</h1></div></div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <h2 style="margin-top:0;">Why we exist</h2>
+    <p>Language barriers are an overlooked challenge in cybersecurity awareness. A person may receive a warning about a fraudulent message but fail to understand what makes it dangerous — or understand every word yet miss the intended meaning.</p>
+    <p>We build a trusted linguistic foundation for cybersecurity awareness in Kenya, developed with the people whose languages the platform supports.</p>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0;">How it works</h2>
+    <ol>
+      <li><strong>Choose</strong> the language, dialect or community you understand best.</li>
+      <li><strong>Contribute</strong> translations, definitions, usage notes and examples.</li>
+      <li><strong>Verify</strong> together — the community supports or disputes candidates.</li>
+      <li><strong>Review</strong> — translators and reviewers confirm cybersecurity accuracy before publication.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="card" style="margin-top:1rem;">
+  <h2 style="margin-top:0;">Our principles</h2>
+  <div class="grid grid-3">
+    <div><h3 class="small">Community first</h3><p class="small muted">Terminology is developed and validated by the communities that speak the language.</p></div>
+    <div><h3 class="small">Meaning over words</h3><p class="small muted">We preserve the cybersecurity meaning, keeping messages culturally relevant and safe.</p></div>
+    <div><h3 class="small">Transparent &amp; auditable</h3><p class="small muted">Every approval is recorded with its revision history and review notes.</p></div>
+    <div><h3 class="small">Fair recognition</h3><p class="small muted">Rewards reflect accuracy and constructive review, not just volume.</p></div>
+    <div><h3 class="small">Open data</h3><p class="small muted">Verified translations can be exported as JSON or CSV, and served via a public API.</p></div>
+    <div><h3 class="small">Privacy-conscious</h3><p class="small muted">Contributor records are minimised; public display is by display name only.</p></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:1rem;">
+  <h2 style="margin-top:0;">For developers &amp; partners</h2>
+  <p class="small">Verified translations are available through a read-only API and as open downloads, so schools, businesses and awareness campaigns can reuse them.</p>
+  <a class="btn btn-ghost" href="{{ url_for('api.health') }}">API status</a>
+  <a class="btn btn-ghost" href="{{ url_for('main.downloads') }}">Downloads</a>
+</div>
+{% endblock %}

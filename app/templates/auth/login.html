@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Sign in · {{ app_short_name }}{% endblock %}
+{% block content %}
+<div class="card" style="max-width:460px;margin:1rem auto;">
+  <h1>Welcome back</h1>
+  <p class="muted">Sign in to translate, review and track your contribution.</p>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="form-row">
+      {{ form.email.label }}
+      {{ form.email(placeholder="you@example.com") }}
+      {% for e in form.email.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+    </div>
+    <div class="form-row">
+      {{ form.password.label }}
+      {{ form.password() }}
+      {% for e in form.password.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+    </div>
+    <label class="checkbox" style="margin-top:.6rem;">{{ form.remember() }} {{ form.remember.label.text }}</label>
+    {{ form.submit(class_="btn btn-primary btn-block", style="margin-top:.8rem;") }}
+  </form>
+  <p class="small" style="margin-top:1rem;">No account yet? <a href="{{ url_for('auth.register') }}">Join the community</a>.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Choose your language · {{ app_short_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Choose the language you understand best</h1>
+    <p class="lead">You can refine your choice with a dialect or community. If you are unsure, keep the broader language — you are not forced to be more specific.</p>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <form class="card" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h3 style="margin-top:0;">Suggestions from your county</h3>
+    <div class="form-row">
+      <label for="county_id">County (optional)</label>
+      <select name="county_id" id="county_id">
+        <option value="">— Select county —</option>
+        {% for c in counties %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <p class="small muted">County information only helps suggest languages and dialects. It does not limit your choice. <button class="btn btn-sm btn-ghost" type="submit">Refresh suggestions</button></p>
+
+    {% if suggested %}
+    <div class="pill-list" style="margin-top:.6rem;">
+      {% for lang in suggested %}<span class="pill">{{ lang.name }}</span>{% endfor %}
+    </div>
+    {% endif %}
+  </form>
+
+  <form class="card" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h3 style="margin-top:0;">Select language &amp; dialect</h3>
+    <div class="form-row">
+      <label for="language_id">Language</label>
+      <select name="language_id" id="language_id" data-language-select required>
+        <option value="">— Select language —</option>
+        {% for l in languages %}<option value="{{ l.id }}">{{ l.name }}{% if l.native_name %} ({{ l.native_name }}){% endif %}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-row">
+      <label for="dialect_id">Dialect / community (optional)</label>
+      <select name="dialect_id" id="dialect_id" data-dialect-select>
+        <option value="0">— None / community-wide —</option>
+        {% for d in all_dialects %}<option value="{{ d.id }}">{{ d.name }} ({{ d.language.name }})</option>{% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit" style="margin-top:1rem;">Continue to tasks</button>
+  </form>
+</div>
+{% endblock %}

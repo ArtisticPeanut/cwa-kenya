@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Canonical: {{ canon.term.english_name }} · {{ app_short_name }}{% endblock %}
+{% block content %}
+<p class="small"><a href="{{ url_for('admin.canonical_list') }}">← Back to canonical translations</a></p>
+
+<div class="page-head">
+  <div>
+    <h1>{{ canon.term.english_name }} · {{ canon.language.name }}{% if canon.dialect %} · {{ canon.dialect.name }}{% endif %}</h1>
+    <p class="lead">Revision {{ canon.revision_no }} · <span class="badge badge-{{ canon.status }}">{{ canon.status.replace('_',' ') }}</span></p>
+  </div>
+</div>
+
+<div class="split">
+  <div>
+    <div class="card">
+      <span class="badge badge-approved">Current canonical</span>
+      <p style="font-size:1.2rem;margin:.6rem 0;">{{ canon.text }}</p>
+      {% if canon.definition %}<p><strong>Meaning:</strong> {{ canon.definition }}</p>{% endif %}
+      {% if canon.context %}<p class="muted"><strong>Context:</strong> {{ canon.context }}</p>{% endif %}
+      <p class="small muted" style="margin-bottom:0;">
+        {% if canon.approver %}Approved by {{ canon.approver.display_name }}{% endif %}
+        {% if canon.approved_at %} on {{ canon.approved_at|datetime }}{% endif %}
+      </p>
+    </div>
+
+    <h2 style="margin-top:1.4rem;">Revision history</h2>
+    <div class="lineage">
+      {% for rev in canon.revisions %}
+      <div class="lineage-item">
+        <strong>#{{ rev.revision_no }} · {{ rev.change_type }}</strong>
+        <p class="small muted" style="margin:.1rem 0;">
+          {{ rev.created_at|datetime }}{% if rev.changer %} · {{ rev.changer.display_name }}{% endif %}
+          {% if rev.note %} · {{ rev.note }}{% endif %}
+        </p>
+        <p class="small" style="margin:0;">{{ rev.snapshot }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <aside>
+    <div class="card">
+      <h3 style="margin-top:0;">Change status</h3>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-row">
+          <label for="status">New status</label>
+          <select name="status" id="status">
+            <option value="approved">Approved / canonical</option>
+            <option value="needs_review">Needs further review</option>
+            <option value="disputed">Disputed</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="note">Note</label>
+          <textarea name="note" rows="3" placeholder="Reason for the change (recorded in history)"></textarea>
+        </div>
+        <button class="btn btn-primary" type="submit" style="margin-top:.6rem;">Update status</button>
+      </form>
+      <p class="small muted" style="margin-top:.8rem;">Where reviewers disagree or evidence is insufficient, mark the entry for further review rather than presenting uncertainty as fact.</p>
+    </div>
+  </aside>
+</div>
+{% endblock %}

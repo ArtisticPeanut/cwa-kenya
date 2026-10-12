@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}{{ term.english_name }} · {{ app_short_name }}{% endblock %}
+{% block content %}
+<p class="small"><a href="{{ url_for('main.tasks') }}">← Back to tasks</a></p>
+
+<div class="page-head">
+  <div>
+    <h1>{{ term.english_name }}</h1>
+    <p class="lead"><span class="badge">{{ category_labels[term.category] }}</span></p>
+  </div>
+  {% if language %}
+  <div class="pill-list">
+    <span class="pill">{{ language.name }}{% if dialect %} · {{ dialect.name }}{% endif %}</span>
+  </div>
+  {% endif %}
+</div>
+
+<div class="split">
+  <div>
+    <div class="reference card">
+      <h3 style="margin-top:0;">What it means</h3>
+      <p class="en">🇬🇧 {{ term.english_name }}</p>
+      <p>{{ term.english_definition }}</p>
+      {% if term.swahili_definition %}
+      <p class="sw">🇰🇪 {{ term.swahili_name }}</p>
+      <p class="sw">{{ term.swahili_definition }}</p>
+      {% endif %}
+      <p class="small muted" style="margin-bottom:0;">A good translation communicates the <em>meaning</em>, not just the English words.</p>
+    </div>
+
+    {% if not language %}
+    <div class="card" style="margin-top:1rem;">
+      <p>Select a language to see and contribute translations.</p>
+      <a class="btn btn-primary" href="{{ url_for('main.select_language') }}">Choose a language</a>
+    </div>
+    {% else %}
+
+    {% if scope %}
+    <div class="consensus-banner" style="margin-top:1rem;">
+      <strong>{{ scope.label }}</strong>
+      {% if scope.state == 'reached' %}
+        — the community strongly supports one translation. It is a candidate for review.
+      {% elif scope.state == 'ambiguous' %}
+        — competing interpretations have similar support. These are preserved for further review.
+      {% elif scope.state == 'insufficient' %}
+        — more community assessments are needed before review.
+      {% else %}
+        — be the first to propose a translation.
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if canonical %}
+    <div class="card" style="margin-top:1rem;border-color:var(--green);">
+      <span class="badge badge-approved">Verified translation</span>
+      <p style="font-size:1.15rem;margin:.6rem 0 .3rem;">{{ canonical.text }}</p>
+      {% if canonical.definition %}<p class="small"><strong>Meaning:</strong> {{ canonical.definition }}</p>{% endif %}
+      {% if canonical.context %}<p class="small muted"><strong>Context:</strong> {{ canonical.context }}</p>{% endif %}
+      <p class="small muted" style="margin-bottom:0;">Revision {{ canonical.revision_no }}{% if canonical.approved_at %} · approved {{ canonical.approved_at|date }}{% endif %}</p>
+    </div>
+    {% endif %}
+
+    <h2 style="margin-top:1.4rem;">Candidate translations ({{ ranked|length }})</h2>
+    {% for item in ranked %}
+      {% set sub = item.submission %}
+      {% set stats = item.stats %}
+      <div class="candidate {% if item.is_leader %}leader{% endif %}">
+        <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+          <div class="text">{{ sub.text }}</div>
+          {% if item.is_leader %}<span class="badge badge-reached">Leading</span>{% endif %}
+        </div>
+        {% if sub.usage_note %}<p class="small" style="margin:.5rem 0 0;"><strong>Usage:</strong> {{ sub.usage_note }}</p>{% endif %}
+        {% if sub.example %}<p class="small muted" style="margin:.3rem 0 0;"><strong>Example:</strong> {{ sub.example }}</p>{% endif %}
+        <p class="small muted" style="margin:.4rem 0 .2rem;">
+          {% if sub.is_seed %}Imported community sample{% else %}{{ sub.user.display_name }}{% endif %}
+          · <span class="badge badge-{{ sub.status }}">{{ status_labels[sub.status] }}</span>
+        </p>
+        <div class="vote-bar">
+          <form method="post" action="{{ url_for('main.vote', submission_id=sub.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="value" value="support">
+            <button class="btn btn-sm {% if my_votes.get(sub.id) == 'support' %}btn-primary{% endif %}" type="submit"
+              {% if not current_user.is_authenticated or current_user.id == sub.user_id %}disabled title="Sign in to assess"{% endif %}>
+              ✔ Communicates meaning ({{ stats.support }})
+            </button>
+          </form>
+          <form method="post" action="{{ url_for('main.vote', submission_id=sub.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="value" value="oppose">
+            <button class="btn btn-sm btn-ghost {% if my_votes.get(sub.id) == 'oppose' %}btn-danger{% endif %}" type="submit"
+              {% if not current_user.is_authenticated or current_user.id == sub.user_id %}disabled title="Sign in to assess"{% endif %}>
+              ✘ Does not ({{ stats.oppose }})
+            </button>
+          </form>
+          <div class="meter" title="{{ stats.ratio|pct }} agreement"><span style="width: {{ stats.ratio|pct }};"></span></div>
+          <span class="ratio">{{ stats.ratio|pct }} agreement · {{ stats.total }} assessments</span>
+        </div>
+      </div>
+    {% else %}
+      <p class="muted">No candidate translations yet. Be the first to propose one.</p>
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  <aside>
+    <div class="card">
+      <h3 style="margin-top:0;">Propose a translation</h3>
+      {% if current_user.is_authenticated %}
+      <form method="post" action="{{ url_for('main.submit_translation', slug=term.slug) }}" novalidate>
+        {{ form.hidden_tag() }}
+        <div class="form-row">
+          {{ form.language_id.label }}
+          {{ form.language_id(data_language_select="1") }}
+        </div>
+        <div class="form-row">
+          {{ form.dialect_id.label }}
+          {{ form.dialect_id(data_dialect_select="1") }}
+        </div>
+        <div class="form-row">
+          {{ form.text.label }}
+          {{ form.text(placeholder="Andika tafsiri yako hapa…") }}
+          {% for e in form.text.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+        </div>
+        <div class="form-row">
+          {{ form.usage_note.label }}
+          {{ form.usage_note(rows="3") }}
+        </div>
+        <div class="form-row">
+          {{ form.example.label }}
+          {{ form.example(rows="3") }}
+        </div>
+        {{ form.submit(class_="btn btn-primary btn-block", style="margin-top:.8rem;") }}
+      </form>
+      {% else %}
+      <p>Sign in to propose a translation, explain local usage and take part in verification.</p>
+      <a class="btn btn-primary btn-block" href="{{ url_for('auth.login') }}">Sign in</a>
+      <a class="btn btn-ghost btn-block" style="margin-top:.5rem;" href="{{ url_for('auth.register') }}">Create account</a>
+      {% endif %}
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+      <h3 style="margin-top:0;">How consensus works</h3>
+      <p class="small muted">Popular translations become <em>candidates for review</em> — not automatic facts. A translator or reviewer then confirms cybersecurity accuracy before a translation is published as verified.</p>
+    </div>
+  </aside>
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Open data · {{ app_short_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Open data &amp; downloads</h1>
+    <p class="lead">Verified translations are freely available for reuse by schools, organisations, businesses and awareness campaigns.</p>
+  </div>
+</div>
+
+<div class="grid grid-3">
+  <div class="card">
+    <h3>JSON</h3>
+    <p class="small muted">Structured records with term, language, dialect, definition and context. {{ count }} verified translations.</p>
+    <a class="btn btn-primary" href="{{ url_for('main.download_json') }}">Download JSON</a>
+  </div>
+  <div class="card">
+    <h3>CSV</h3>
+    <p class="small muted">Spreadsheet-friendly export of the same verified translations.</p>
+    <a class="btn btn-primary" href="{{ url_for('main.download_csv') }}">Download CSV</a>
+  </div>
+  <div class="card">
+    <h3>API</h3>
+    <p class="small muted">Serve verified translations directly to websites and mobile apps.</p>
+    <a class="btn btn-ghost" href="{{ url_for('api.translations') }}">Open API</a>
+  </div>
+</div>
+
+<div class="card" style="margin-top:1rem;">
+  <h3 style="margin-top:0;">API quick reference</h3>
+  <ul class="small">
+    <li><code>GET /api/v1/translations</code> — all verified translations</li>
+    <li><code>GET /api/v1/translations?language=Kikuyu</code> — filter by language</li>
+    <li><code>GET /api/v1/translations/phishing</code> — all verified translations for a term</li>
+    <li><code>GET /api/v1/terms</code> — the cybersecurity glossary</li>
+    <li><code>GET /api/v1/languages</code> — languages and dialects</li>
+    <li><code>GET /api/v1/counties</code> — the 47 counties</li>
+  </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Data · {{ app_short_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Import &amp; export</h1>
+    <p class="lead">Bring in other response files or export the verified dataset.</p>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <h3 style="margin-top:0;">Import responses</h3>
+    <p class="small muted">Import a Google Forms responses CSV. Duplicate submissions are skipped automatically. Expected columns include County, Language, Dialect and “Translate: …” columns.</p>
+    <form method="post" action="{{ url_for('admin.run_import') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-row">
+        <label for="csv_path">Path to CSV on the server</label>
+        <input type="text" name="csv_path" id="csv_path" placeholder="C:\path\to\responses.csv">
+      </div>
+      <button class="btn btn-primary" type="submit" style="margin-top:.6rem;">Run import</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Export</h3>
+    <p class="small muted">{{ approved }} approved translations · {{ submissions }} submissions.</p>
+    <a class="btn btn-primary" href="{{ url_for('admin.export_json') }}">Verified translations (JSON)</a>
+    <a class="btn btn-primary" href="{{ url_for('admin.export_csv') }}" style="margin-top:.4rem;">Verified translations (CSV)</a>
+    <a class="btn btn-ghost" href="{{ url_for('admin.export_json', all=1) }}" style="margin-top:.4rem;">All canonicals incl. unapproved (JSON)</a>
+    <a class="btn btn-ghost" href="{{ url_for('admin.export_submissions') }}" style="margin-top:.4rem;">All submissions (CSV)</a>
+  </div>
+</div>
+
+<div class="card" style="margin-top:1rem;">
+  <h3 style="margin-top:0;">Command-line equivalents</h3>
+  <pre class="small"><code>flask init-db
+flask seed
+flask import-csv "path/to/responses.csv"
+flask create-user
+flask export --format json &gt; translations.json</code></pre>
+</div>
+{% endblock %}

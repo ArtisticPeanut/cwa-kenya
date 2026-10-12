@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Review queue · {{ app_short_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Review queue</h1>
+    <p class="lead">Scopes with community submissions. Consensus makes a translation a candidate for review — approval requires linguistic and cybersecurity checks.</p>
+  </div>
+</div>
+
+<form class="card" method="get" style="margin-bottom:1rem;">
+  <div class="form-grid">
+    <div class="form-row">
+      <label for="language_id">Language</label>
+      <select name="language_id" id="language_id">
+        <option value="">All languages</option>
+        {% for l in languages %}<option value="{{ l.id }}" {% if language_id == l.id %}selected{% endif %}>{{ l.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <label class="checkbox" style="align-self:end;">
+      <input type="checkbox" name="ready" value="1" {% if only_ready %}checked{% endif %}> Only consensus-reached
+    </label>
+    <div class="form-row" style="align-self:end;"><button class="btn btn-primary" type="submit">Filter</button></div>
+  </div>
+</form>
+
+{% if queue %}
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr><th>Term</th><th>Language</th><th>Dialect</th><th>Candidates</th><th>Community status</th><th>Canonical</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for row in queue %}
+    <tr>
+      <td><a href="{{ url_for('admin.compare', term_id=row.term.id, language_id=row.language.id, dialect_id=row.dialect.id if row.dialect else None) }}">{{ row.term.english_name }}</a></td>
+      <td>{{ row.language.name }}</td>
+      <td>{{ row.dialect.name if row.dialect else '—' }}</td>
+      <td>{{ row.count }}</td>
+      <td>
+        {% set s = row.consensus.state %}
+        <span class="badge badge-{{ s }}">{{ consensus_labels[s] }}</span>
+      </td>
+      <td>{% if row.canonical %}<span class="badge badge-approved">Yes</span>{% else %}<span class="muted small">No</span>{% endif %}</td>
+      <td class="nowrap">
+        <a class="btn btn-sm btn-primary" href="{{ url_for('admin.compare', term_id=row.term.id, language_id=row.language.id, dialect_id=row.dialect.id if row.dialect else None) }}">Review</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card"><p class="muted" style="margin:0;">Nothing in the queue for this filter.</p></div>
+{% endif %}
+{% endblock %}

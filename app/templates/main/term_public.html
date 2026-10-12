@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ term.english_name }} · {{ app_short_name }}{% endblock %}
+{% block content %}
+<p class="small"><a href="{{ url_for('main.browse') }}">← Back to glossary</a></p>
+<div class="page-head">
+  <div>
+    <h1>{{ term.english_name }}</h1>
+    <span class="badge">{{ category_labels[term.category] }}</span>
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">English definition</h3>
+  <p>{{ term.english_definition }}</p>
+  {% if term.swahili_definition %}
+  <h3>Kiswahili</h3>
+  <p><strong>{{ term.swahili_name }}</strong> — {{ term.swahili_definition }}</p>
+  {% endif %}
+</div>
+
+<h2 style="margin-top:1.4rem;">Verified translations</h2>
+{% if canonicals %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Language</th><th>Dialect</th><th>Translation</th><th>Meaning / context</th><th>Revision</th></tr></thead>
+  <tbody>
+    {% for c in canonicals %}
+    <tr>
+      <td>{{ c.language.name }}</td>
+      <td>{{ c.dialect.name if c.dialect else '—' }}</td>
+      <td>{{ c.text }}</td>
+      <td class="small">{{ c.definition or '' }}{% if c.context %}<br><span class="muted">{{ c.context }}</span>{% endif %}</td>
+      <td class="small">#{{ c.revision_no }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="muted">No verified translation yet.</p>
+{% endif %}
+{% endblock %}

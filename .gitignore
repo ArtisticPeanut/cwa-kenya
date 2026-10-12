@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.env
+data/*.db
+data/*.sqlite
+instance/
+.pytest_cache/
+*.log
+
+# Raw form responses contain contributor email addresses (PII) — keep out of git
+*Responses*.csv
+*Form responses*.csv
