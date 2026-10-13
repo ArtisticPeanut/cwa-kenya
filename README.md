@@ -28,10 +28,12 @@ python run.py          # http://127.0.0.1:5000
 ```
 
 > Upgrading an existing database? Add the `username` column and backfill it from
-> each account's email:
+> each account's email, then add the email-verification columns (existing
+> accounts are treated as already verified so nobody is locked out):
 >
 > ```powershell
 > flask migrate-usernames
+> flask migrate-email-verification
 > ```
 
 To import a different responses file:
@@ -130,6 +132,7 @@ cwa_project/
 | `/about` | Project vision and principles |
 | `/auth/login` | Sign in with a username **or** email |
 | `/auth/register` | Create a contributor account |
+| `/auth/verify` | Confirm your email with the 6-digit code |
 | `/auth/forgot` | Request a one-time reset code by email |
 | `/auth/reset` | Enter the code and choose a new password |
 
@@ -145,10 +148,16 @@ cwa_project/
 - The dialect switcher only appears for languages that actually have
   dialect-tagged content, and it never changes the site-wide selected language.
 
-## Accounts & password reset
+## Accounts, verification & password reset
 
 - Every account has a unique **username** (3–30 letters, numbers or underscores).
   Sign in with either the username or the email address.
+- **Email verification at sign-up.** Registering sends a 6-digit code; the account
+  stays inactive and **cannot sign in until the code is confirmed** at `/auth/verify`.
+  A "Resend code" button issues a fresh code (60-second cooldown) and invalidates
+  the previous one.
+- Accounts that already existed before verification was introduced are marked
+  verified by `flask migrate-email-verification`, so nobody is locked out.
 - **Forgot password** emails a 6-digit one-time code (`OTP_TTL_MINUTES`, default 10
   minutes, `OTP_MAX_ATTEMPTS` tries). Only a hash of the code is stored; codes are
   single-use and a fresh request invalidates earlier ones.
@@ -205,7 +214,7 @@ Copy `.env.example` to `.env` and adjust. Key options:
 | `SMTP_USER` / `SMTP_PASSWORD` | SMTP credentials |
 | `SMTP_USE_TLS` | STARTTLS on port 587 (default 1); set 0 for SSL on 465 |
 | `MAIL_FROM` / `MAIL_FROM_NAME` | Sender address and display name |
-| `OTP_TTL_MINUTES` | Password-reset code lifetime (default 10) |
+| `OTP_TTL_MINUTES` | Lifetime of sign-up verification & password-reset codes (default 10) |
 | `OTP_MAX_ATTEMPTS` | Wrong-code attempts allowed per code (default 5) |
 
 ---
@@ -237,9 +246,14 @@ Before you invite users, make sure you have:
 
 ### Login & account safety
 
-- Passwords are hashed with Werkzeug (scrypt) and reset codes are hashed too.
-- Sign-in, registration, and password reset are **rate limited** (`10/min` login,
-  `20/hr` register, `5/min` forgot, `10/min` reset) per client IP.
+- Passwords are hashed with Werkzeug (scrypt) and reset/verification codes are
+  hashed too.
+- New accounts must **confirm their email** before they can sign in; verification
+  codes are single-use, expire after `OTP_TTL_MINUTES`, and allow
+  `OTP_MAX_ATTEMPTS` tries.
+- Sign-in, registration, password reset and resend are **rate limited** (`10/min`
+  login, `20/hr` register, `5/min` forgot, `10/min` reset, `5/min` resend) per
+  client IP.
 - The `next=` redirect after sign-in only accepts same-site paths (no open redirect).
 - Reset codes are single-use, expire after `OTP_TTL_MINUTES`, and allow
   `OTP_MAX_ATTEMPTS` tries before a new code is required.
@@ -252,7 +266,8 @@ Before you invite users, make sure you have:
 ## Data model (highlights)
 
 - **Reference:** `counties`, `languages`, `dialects`, `language_counties`, `terms`
-- **Contributors:** `users`, `submissions`, `votes`, `reviews`
+- **Contributors:** `users`, `submissions`, `votes`, `reviews`,
+  `password_reset_otps`, `email_verification_otps`
 - **Output:** `canonical_translations`, `canonical_revisions` (full audit history)
 - **Recognition:** `milestones`, `user_milestones`, `contributions` (append-only ledger)
 
@@ -270,7 +285,8 @@ python -m pytest
 
 Covers reference data, the public routes, registration, submission, self-vote
 protection, consensus (reached and ambiguous), canonical approval + revision
-history, milestones, exports and the API.
+history, milestones, exports and the API. Auth tests also cover the login
+redirect guard, production `SECRET_KEY` enforcement, and rate limiting.
 
 ---
 

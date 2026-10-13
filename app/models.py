@@ -211,6 +211,8 @@ class User(UserMixin, db.Model):
 
     is_active = db.Column(Boolean, default=True, nullable=False)
     is_seed = db.Column(Boolean, default=False, nullable=False)
+    email_verified = db.Column(Boolean, default=False, nullable=False)
+    email_verified_at = db.Column(DateTime, nullable=True)
     created_at = db.Column(DateTime, default=utcnow, nullable=False)
     last_login_at = db.Column(DateTime, nullable=True)
 
@@ -223,6 +225,9 @@ class User(UserMixin, db.Model):
     reset_otps = relationship(
         "PasswordResetOTP", back_populates="user", cascade="all, delete-orphan"
     )
+    verification_otps = relationship(
+        "EmailVerificationOTP", back_populates="user", cascade="all, delete-orphan"
+    )
 
     # -- helpers ----------------------------------------------------------- #
     def set_password(self, password):
@@ -232,6 +237,10 @@ class User(UserMixin, db.Model):
         if not self.password_hash:
             return False
         return check_password_hash(self.password_hash, password)
+
+    def mark_email_verified(self):
+        self.email_verified = True
+        self.email_verified_at = utcnow()
 
     @staticmethod
     def normalize_username(value):
@@ -281,14 +290,13 @@ class User(UserMixin, db.Model):
         return f"<User {self.email} ({self.role})>"
 
 
-class PasswordResetOTP(db.Model):
-    """A one-time code emailed to a user who forgot their password.
+class OneTimeCodeMixin:
+    """Shared behaviour for emailed one-time codes.
 
     Only a hash of the code is stored. Codes are single-use, expire after a
-    short window, and allow a limited number of verification attempts.
+    short window, and allow a limited number of verification attempts. Each
+    concrete model gets its own table.
     """
-
-    __tablename__ = "password_reset_otps"
 
     id = db.Column(Integer, primary_key=True)
     user_id = db.Column(
@@ -299,8 +307,6 @@ class PasswordResetOTP(db.Model):
     used = db.Column(Boolean, default=False, nullable=False)
     attempts = db.Column(Integer, default=0, nullable=False)
     created_at = db.Column(DateTime, default=utcnow, nullable=False)
-
-    user = relationship("User", back_populates="reset_otps")
 
     @classmethod
     def issue(cls, user, ttl_minutes=10):
@@ -341,7 +347,23 @@ class PasswordResetOTP(db.Model):
         return False
 
     def __repr__(self):
-        return f"<PasswordResetOTP user={self.user_id} used={self.used}>"
+        return f"<{type(self).__name__} user={self.user_id} used={self.used}>"
+
+
+class PasswordResetOTP(OneTimeCodeMixin, db.Model):
+    """A one-time code emailed to a user who forgot their password."""
+
+    __tablename__ = "password_reset_otps"
+
+    user = relationship("User", back_populates="reset_otps")
+
+
+class EmailVerificationOTP(OneTimeCodeMixin, db.Model):
+    """A one-time code emailed to confirm ownership of a new account's email."""
+
+    __tablename__ = "email_verification_otps"
+
+    user = relationship("User", back_populates="verification_otps")
 
 
 class Submission(db.Model):

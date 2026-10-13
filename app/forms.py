@@ -75,6 +75,18 @@ class ResetPasswordForm(FlaskForm):
     submit = SubmitField("Set new password")
 
 
+class VerifyEmailForm(FlaskForm):
+    code = StringField(
+        "Verification code",
+        validators=[DataRequired(), Length(6, 6, message="Enter the 6-digit code.")],
+    )
+    submit = SubmitField("Verify email")
+
+
+class ResendVerificationForm(FlaskForm):
+    submit = SubmitField("Resend code")
+
+
 class ProfileForm(FlaskForm):
     display_name = StringField("Display name", validators=[DataRequired(), Length(2, 120)])
     username = StringField(

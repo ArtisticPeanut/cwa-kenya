@@ -59,7 +59,6 @@ def send_email(to, subject, body_text, body_html=None):
 
 
 def send_password_reset_email(user, code):
-    """Email a one-time password-reset code to a user."""
     app_short = current_app.config.get("APP_SHORT_NAME", "CWA Kenya")
     minutes = current_app.config.get("OTP_TTL_MINUTES", 10)
     name = user.display_name or user.username or "there"
@@ -85,6 +84,39 @@ def send_password_reset_email(user, code):
         f'text-align:center;">{code}</p>'
         f"<p>This code expires in {minutes} minutes. If you did not request it, "
         f"you can ignore this email.</p>"
+        f'<p style="color:#6b7280;">— Mimo &amp; the {app_short} team</p>'
+        f"</div>"
+    )
+    return send_email(user.email, subject, body_text, body_html)
+
+
+def send_verification_email(user, code):
+    """Email a one-time code that confirms ownership of the sign-up address."""
+    app_short = current_app.config.get("APP_SHORT_NAME", "CWA Kenya")
+    minutes = current_app.config.get("OTP_TTL_MINUTES", 10)
+    name = user.display_name or user.username or "there"
+    subject = f"Confirm your {app_short} email"
+    body_text = (
+        f"Karibu {name}!\n\n"
+        f"Thanks for joining {app_short}. Confirm your email address to "
+        f"activate your contributor account.\n\n"
+        f"Your verification code is: {code}\n\n"
+        f"Enter this code on the website. It expires in {minutes} minutes.\n"
+        f"If you did not create an account, you can safely ignore this email.\n\n"
+        f"— Mimo & the {app_short} team\n"
+    )
+    body_html = (
+        f'<div style="font-family:Segoe UI,system-ui,Arial,sans-serif;color:#1e2235;'
+        f'max-width:480px;margin:auto;">'
+        f'<h2 style="color:#4338ca;margin:0 0 .4rem;">{app_short}</h2>'
+        f"<p>Karibu {name}!</p>"
+        f"<p>Thanks for joining {app_short}. Confirm your email address to "
+        f"activate your contributor account:</p>"
+        f'<p style="font-size:2rem;font-weight:800;letter-spacing:.3em;'
+        f'background:#eef2ff;color:#3730a3;padding:.6rem 1rem;border-radius:12px;'
+        f'text-align:center;">{code}</p>'
+        f"<p>This code expires in {minutes} minutes. If you did not create an "
+        f"account, you can safely ignore this email.</p>"
         f'<p style="color:#6b7280;">— Mimo &amp; the {app_short} team</p>'
         f"</div>"
     )

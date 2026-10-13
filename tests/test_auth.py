@@ -1,5 +1,5 @@
 from app.extensions import db
-from app.models import PasswordResetOTP, User
+from app.models import EmailVerificationOTP, PasswordResetOTP, User
 
 
 def _register(client, **overrides):
@@ -18,12 +18,20 @@ def _register(client, **overrides):
     return client.post("/auth/register", data=data, follow_redirects=True)
 
 
+def _mark_verified(email):
+    user = User.query.filter_by(email=email).first()
+    user.mark_email_verified()
+    db.session.commit()
+    return user
+
+
 def test_register_creates_username(app, client):
     resp = _register(client)
     assert resp.status_code == 200
     user = User.query.filter_by(email="amani@example.ke").first()
     assert user is not None
     assert user.username == "amani_w"
+    assert user.email_verified is False
 
 
 def test_register_rejects_duplicate_username(app, client):
@@ -49,6 +57,7 @@ def test_register_rejects_bad_username(app, client):
 def test_login_with_username_or_email(app, client):
     _register(client)
     client.get("/auth/logout")
+    _mark_verified("amani@example.ke")
 
     by_username = client.post(
         "/auth/login",
@@ -93,6 +102,7 @@ def test_seed_user_cannot_login(app, client):
 def test_forgot_password_otp_flow(app, client, monkeypatch):
     _register(client)
     client.get("/auth/logout")
+    _mark_verified("amani@example.ke")
 
     captured = {}
 
@@ -154,6 +164,7 @@ def test_forgot_password_unknown_account_is_generic(app, client):
 def test_login_next_rejects_external_redirect(app, client):
     _register(client)
     client.get("/auth/logout")
+    _mark_verified("amani@example.ke")
     resp = client.post(
         "/auth/login?next=//evil.example.com",
         data={"identifier": "amani_w", "password": "strongpass1"},
@@ -167,6 +178,7 @@ def test_login_next_rejects_external_redirect(app, client):
 def test_login_next_allows_relative_path(app, client):
     _register(client)
     client.get("/auth/logout")
+    _mark_verified("amani@example.ke")
     resp = client.post(
         "/auth/login?next=/tasks/phishing",
         data={"identifier": "amani_w", "password": "strongpass1"},
@@ -213,3 +225,76 @@ def test_login_is_rate_limited(monkeypatch):
     ]
     assert 429 in codes
     limiter.reset()
+
+
+def _capture_verification(monkeypatch):
+    captured = {}
+
+    def fake_send(user, code):
+        captured["code"] = code
+        captured["user_id"] = user.id
+        return True
+
+    monkeypatch.setattr("app.auth.send_verification_email", fake_send)
+    monkeypatch.setattr("app.auth.mail_configured", lambda: True)
+    return captured
+
+
+def test_register_requires_email_verification(app, client, monkeypatch):
+    captured = _capture_verification(monkeypatch)
+    resp = _register(client)
+    assert b"emailed a 6-digit code" in resp.data
+
+    user = User.query.filter_by(email="amani@example.ke").first()
+    assert user.email_verified is False
+    assert EmailVerificationOTP.query.filter_by(user_id=user.id, used=False).count() == 1
+    assert len(captured["code"]) == 6
+
+    blocked = client.post(
+        "/auth/login",
+        data={"identifier": "amani_w", "password": "strongpass1"},
+        follow_redirects=True,
+    )
+    assert b"confirm your email" in blocked.data.lower()
+
+    page = client.get("/auth/verify")
+    assert page.status_code == 200
+
+    done = client.post(
+        "/auth/verify", data={"code": captured["code"]}, follow_redirects=True
+    )
+    assert b"Email confirmed" in done.data
+    user = User.query.filter_by(email="amani@example.ke").first()
+    assert user.email_verified is True
+    assert user.email_verified_at is not None
+
+
+def test_verify_rejects_wrong_code(app, client, monkeypatch):
+    _capture_verification(monkeypatch)
+    _register(client)
+    resp = client.post(
+        "/auth/verify", data={"code": "000000"}, follow_redirects=True
+    )
+    assert b"not valid or has expired" in resp.data
+    user = User.query.filter_by(email="amani@example.ke").first()
+    assert user.email_verified is False
+
+
+def test_verification_resend_has_cooldown(app, client, monkeypatch):
+    captured = _capture_verification(monkeypatch)
+    _register(client)
+    first_code = captured["code"]
+    resp = client.post("/auth/verify/resend", data={}, follow_redirects=True)
+    assert b"just sent" in resp.data
+    # The cooldown prevents a fresh code from being issued immediately.
+    assert captured["code"] == first_code
+
+
+def test_register_without_smtp_reports_console(app, client, monkeypatch):
+    monkeypatch.setattr("app.auth.mail_configured", lambda: False)
+    monkeypatch.setattr("app.auth.send_verification_email", lambda u, c: False)
+    resp = _register(client)
+    assert b"printed to the server console" in resp.data
+    user = User.query.filter_by(email="amani@example.ke").first()
+    assert user.email_verified is False
+

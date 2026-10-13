@@ -17,6 +17,7 @@ def register_cli(app):
     app.cli.add_command(repair_classification)
     app.cli.add_command(create_user)
     app.cli.add_command(migrate_usernames)
+    app.cli.add_command(migrate_email_verification)
     app.cli.add_command(export_data)
 
 
@@ -112,6 +113,44 @@ def migrate_usernames():
         changed += 1
     db.session.commit()
     click.echo(f"Backfilled {changed} username(s).")
+
+
+@click.command("migrate-email-verification")
+@with_appcontext
+def migrate_email_verification():
+    """Add the email-verification columns and treat existing accounts as verified.
+
+    Legacy accounts (created before email verification existed) are marked
+    verified so nobody is locked out; only accounts created afterwards must
+    confirm their address.
+    """
+    db.create_all()  # creates the email_verification_otps table on older databases
+    from sqlalchemy import inspect, text
+
+    columns = {c["name"] for c in inspect(db.engine).get_columns("users")}
+    if "email_verified" not in columns:
+        db.session.execute(
+            text("ALTER TABLE users ADD COLUMN email_verified BOOLEAN")
+        )
+        click.echo("Added users.email_verified column.")
+    if "email_verified_at" not in columns:
+        db.session.execute(
+            text("ALTER TABLE users ADD COLUMN email_verified_at DATETIME")
+        )
+        click.echo("Added users.email_verified_at column.")
+    db.session.commit()
+
+    # Rows that predate the column are NULL — mark them verified. Genuinely
+    # unverified new accounts store 0, so this update is safely idempotent.
+    result = db.session.execute(
+        text(
+            "UPDATE users SET email_verified = 1, "
+            "email_verified_at = COALESCE(email_verified_at, CURRENT_TIMESTAMP) "
+            "WHERE email_verified IS NULL"
+        )
+    )
+    db.session.commit()
+    click.echo(f"Marked {result.rowcount or 0} existing account(s) as verified.")
 
 
 @click.command("export")

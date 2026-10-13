@@ -43,8 +43,10 @@ def sample_language(app):
     return Language.query.filter_by(name="Kikuyu").first()
 
 
-def make_user(app, email, name, role="contributor", password="supersecret1"):
-    user = User(email=email, display_name=name, role=role)
+def make_user(app, email, name, role="contributor", password="supersecret1",
+              email_verified=True):
+    user = User(email=email, display_name=name, role=role,
+                email_verified=email_verified)
     user.set_password(password)
     db.session.add(user)
     db.session.commit()

@@ -19,10 +19,23 @@ from app.forms import (
     LoginForm,
     ProfileForm,
     RegisterForm,
+    ResendVerificationForm,
     ResetPasswordForm,
+    VerifyEmailForm,
 )
-from app.models import County, Dialect, Language, PasswordResetOTP, User
-from app.services.email import send_password_reset_email
+from app.models import (
+    County,
+    Dialect,
+    EmailVerificationOTP,
+    Language,
+    PasswordResetOTP,
+    User,
+)
+from app.services.email import (
+    mail_configured,
+    send_password_reset_email,
+    send_verification_email,
+)
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -40,6 +53,49 @@ def _safe_next(target):
     if target.startswith("//") or target.startswith("/\\"):
         return None
     return target
+
+
+def _issue_verification(user):
+    """Create a fresh email-verification code and try to email it.
+
+    Returns one of:
+      "sent"   — handed to the configured SMTP server
+      "logged" — no SMTP configured, so the code was written to the console/log
+      "failed" — sending raised; the user can request a new code
+
+    The code record is always saved by the caller so it can be resent.
+    """
+    _record, code = EmailVerificationOTP.issue(
+        user, ttl_minutes=current_app.config["OTP_TTL_MINUTES"]
+    )
+    if not mail_configured():
+        send_verification_email(user, code)  # falls back to console logging
+        return "logged"
+    try:
+        send_verification_email(user, code)
+        return "sent"
+    except Exception:  # noqa: BLE001 - keep the account, let them resend
+        current_app.logger.exception("Verification email failed")
+        return "failed"
+
+
+def _verification_flash(status, email):
+    """Flash an honest message about how the verification code was delivered."""
+    if status == "sent":
+        flash(f"We've emailed a 6-digit code to {email}.", "success")
+    elif status == "logged":
+        flash(
+            "Email delivery isn't set up yet, so the 6-digit code was printed "
+            "to the server console. Configure SMTP_* in your .env to send real "
+            "email.",
+            "info",
+        )
+    else:
+        flash(
+            "We couldn't send the email right now. Please tap \"Resend code\" "
+            "to try again.",
+            "warning",
+        )
 
 
 def county_choices():
@@ -100,10 +156,13 @@ def register():
         )
         user.set_password(form.password.data)
         db.session.add(user)
+        db.session.flush()  # assign an id so the verification code can link to it
+        status = _issue_verification(user)
         db.session.commit()
-        login_user(user)
-        flash("Welcome! Your contributor account has been created.", "success")
-        return redirect(url_for("main.tasks"))
+        session["verify_uid"] = user.id
+        session["verify_sent_at"] = time.time()
+        _verification_flash(status, email)
+        return redirect(url_for("auth.verify_email"))
     return render_template("auth/register.html", form=form)
 
 
@@ -119,6 +178,14 @@ def login():
         if user and user.is_seed:
             flash("This is an imported record and cannot be used to sign in.", "warning")
         elif user and user.check_password(form.password.data):
+            if not user.email_verified:
+                session["verify_uid"] = user.id
+                flash(
+                    "Please confirm your email before signing in. "
+                    "Enter the code we emailed you, or request a new one.",
+                    "warning",
+                )
+                return redirect(url_for("auth.verify_email"))
             user.last_login_at = datetime.now(timezone.utc)
             db.session.commit()
             login_user(user, remember=form.remember.data)
@@ -130,6 +197,73 @@ def login():
         else:
             flash("Invalid username/email or password.", "danger")
     return render_template("auth/login.html", form=form)
+
+
+@auth_bp.route("/verify", methods=["GET", "POST"])
+@limiter.limit("10 per minute", methods=["POST"],
+               error_message="Too many attempts. Please wait a minute and try again.")
+def verify_email():
+    if current_user.is_authenticated:
+        return redirect(url_for("main.home"))
+    uid = session.get("verify_uid")
+    user = db.session.get(User, uid) if uid else None
+    if not user:
+        flash("Create an account first, then confirm your email.", "info")
+        return redirect(url_for("auth.register"))
+    if user.email_verified:
+        flash("Your email is already confirmed. Please sign in.", "info")
+        return redirect(url_for("auth.login"))
+
+    form = VerifyEmailForm()
+    resend_form = ResendVerificationForm()
+    if form.validate_on_submit():
+        record = (
+            EmailVerificationOTP.query.filter_by(user_id=user.id, used=False)
+            .order_by(EmailVerificationOTP.created_at.desc())
+            .first()
+        )
+        max_attempts = current_app.config["OTP_MAX_ATTEMPTS"]
+        if record and record.verify(form.code.data, max_attempts=max_attempts):
+            user.mark_email_verified()
+            db.session.commit()
+            session.pop("verify_uid", None)
+            session.pop("verify_sent_at", None)
+            login_user(user)
+            flash("Email confirmed — karibu aboard!", "success")
+            return redirect(url_for("main.tasks"))
+        db.session.commit()
+        flash("That code is not valid or has expired. Check it and try again.", "danger")
+    return render_template(
+        "auth/verify_email.html", form=form, resend_form=resend_form, email=user.email
+    )
+
+
+@auth_bp.route("/verify/resend", methods=["POST"])
+@limiter.limit("5 per minute", methods=["POST"],
+               error_message="Too many resend requests. Please wait a minute and try again.")
+def resend_verification():
+    if current_user.is_authenticated:
+        return redirect(url_for("main.home"))
+    resend_form = ResendVerificationForm()
+    if not resend_form.validate_on_submit():
+        return redirect(url_for("auth.verify_email"))
+    uid = session.get("verify_uid")
+    user = db.session.get(User, uid) if uid else None
+    if not user:
+        flash("Create an account first, then confirm your email.", "info")
+        return redirect(url_for("auth.register"))
+    if user.email_verified:
+        flash("Your email is already confirmed. Please sign in.", "info")
+        return redirect(url_for("auth.login"))
+    sent_at = session.get("verify_sent_at")
+    if sent_at and (time.time() - sent_at) < RESEND_COOLDOWN_SECONDS:
+        flash("A code was just sent. Please check your inbox.", "info")
+        return redirect(url_for("auth.verify_email"))
+    sent = _issue_verification(user)
+    db.session.commit()
+    session["verify_sent_at"] = time.time()
+    _verification_flash(sent, user.email)
+    return redirect(url_for("auth.verify_email"))
 
 
 @auth_bp.route("/logout")
