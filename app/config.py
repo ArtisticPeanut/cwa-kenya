@@ -91,6 +91,12 @@ class Config:
     MAIL_FROM = os.environ.get("MAIL_FROM") or os.environ.get("SMTP_USER")
     MAIL_FROM_NAME = os.environ.get("MAIL_FROM_NAME", "Cyber Words Africa")
 
+    # Optional HTTPS email API. Use these on hosts that block outbound SMTP
+    # (e.g. Render's free plan): traffic goes over port 443 instead. When set,
+    # they take precedence over SMTP. Set exactly one API key.
+    BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
+    RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
+
     # One-time codes for password reset
     OTP_TTL_MINUTES = int(os.environ.get("OTP_TTL_MINUTES", "10"))
     OTP_MAX_ATTEMPTS = int(os.environ.get("OTP_MAX_ATTEMPTS", "5"))

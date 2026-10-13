@@ -37,6 +37,13 @@ services:
         sync: false
       - key: MAIL_FROM_NAME
         value: Cyber Words Africa
+      # Render's FREE plan blocks outbound SMTP (ports 25/465/587), so set an
+      # HTTPS email API key below for real delivery — it uses port 443. Set
+      # exactly one; it takes precedence over SMTP. Leave SMTP_* blank/optional.
+      - key: BREVO_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
 
     # --- Optional: keep data across restarts/deploys -----------------------
     # The free plan has an ephemeral disk, so the SQLite database resets on

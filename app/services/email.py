@@ -1,33 +1,55 @@
 """Outbound email helper.
 
-Uses SMTP when configured (via SMTP_* settings). When SMTP_HOST is not set the
-message is written to the application log and stdout instead, so development
-and demos work without a mail server. Real credentials can be plugged in later
-without any code change.
+Sending order:
+
+1. HTTPS email API (Brevo or Resend) when an API key is configured. This works
+   on hosts that block outbound SMTP (e.g. Render's free plan) because it uses
+   port 443.
+2. SMTP when SMTP_HOST is set.
+3. Otherwise the message is written to the application log and stdout, so
+   development and demos work without a mail server.
 """
 
+import json
 import smtplib
 import ssl
+import urllib.error
+import urllib.request
 from email.message import EmailMessage
 from email.utils import formataddr
 
 from flask import current_app
 
 
+def _api_provider():
+    cfg = current_app.config
+    if cfg.get("BREVO_API_KEY"):
+        return "brevo"
+    if cfg.get("RESEND_API_KEY"):
+        return "resend"
+    return None
+
+
 def mail_configured():
-    return bool(current_app.config.get("SMTP_HOST"))
+    return bool(_api_provider() or current_app.config.get("SMTP_HOST"))
 
 
 def send_email(to, subject, body_text, body_html=None):
-    """Send an email, or log it when no SMTP server is configured.
+    """Send an email, or log it when no provider is configured.
 
-    Returns True when handed to an SMTP server, False when it was logged.
+    Returns True when handed to a mail provider, False when it was logged.
+    Raises if a configured provider rejects the message.
     """
     cfg = current_app.config
     sender = cfg.get("MAIL_FROM")
     from_name = cfg.get("MAIL_FROM_NAME") or cfg.get("APP_SHORT_NAME")
 
-    if not mail_configured():
+    provider = _api_provider()
+    if provider:
+        _send_via_api(provider, to, subject, body_text, body_html, sender, from_name)
+        return True
+
+    if not cfg.get("SMTP_HOST"):
         _log_dev_message(to, subject, body_text)
         return False
 
@@ -56,6 +78,51 @@ def send_email(to, subject, body_text, body_html=None):
                 server.login(cfg["SMTP_USER"], cfg.get("SMTP_PASSWORD") or "")
             server.send_message(msg)
     return True
+
+
+def _send_via_api(provider, to, subject, text, html, sender, from_name):
+    """POST the message to a transactional email API over HTTPS."""
+    if not sender:
+        raise RuntimeError("MAIL_FROM must be set to send email via the API.")
+
+    if provider == "brevo":
+        url = "https://api.brevo.com/v3/smtp/email"
+        headers = {
+            "api-key": current_app.config["BREVO_API_KEY"],
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        payload = {
+            "sender": {"name": from_name or "CWA Kenya", "email": sender},
+            "to": [{"email": to}],
+            "subject": subject,
+            "textContent": text,
+        }
+        if html:
+            payload["htmlContent"] = html
+    else:  # resend
+        url = "https://api.resend.com/emails"
+        headers = {
+            "Authorization": f"Bearer {current_app.config['RESEND_API_KEY']}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "from": formataddr((from_name, sender)) if from_name else sender,
+            "to": [to],
+            "subject": subject,
+            "text": text,
+        }
+        if html:
+            payload["html"] = html
+
+    data = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            response.read()
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")
+        raise RuntimeError(f"{provider} API error {exc.code}: {detail}") from exc
 
 
 def send_password_reset_email(user, code):

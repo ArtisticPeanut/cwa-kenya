@@ -1,5 +1,25 @@
+import io
+import json
+import urllib.error
+
+import pytest
+
 from app import create_app
 from app.services import email as email_service
+
+
+class _FakeResponse:
+    def __init__(self, body=b""):
+        self._body = body
+
+    def read(self):
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
 
 
 class _FakeSMTP:
@@ -97,3 +117,89 @@ def test_verification_email_builds_message(monkeypatch):
     assert captured["to"] == "amani@example.ke"
     assert "123456" in captured["body_text"]
     assert "123456" in captured["body_html"]
+
+
+def test_send_email_uses_brevo_api(monkeypatch):
+    app = create_app("testing")
+    app.config.update(
+        BREVO_API_KEY="key123",
+        RESEND_API_KEY=None,
+        SMTP_HOST=None,
+        MAIL_FROM="bot@example.com",
+        MAIL_FROM_NAME="CWA",
+    )
+
+    captured = {}
+
+    def fake_urlopen(request, timeout=None):
+        captured["url"] = request.full_url
+        captured["headers"] = {k.lower(): v for k, v in request.header_items()}
+        captured["data"] = json.loads(request.data.decode("utf-8"))
+        return _FakeResponse()
+
+    monkeypatch.setattr(email_service.urllib.request, "urlopen", fake_urlopen)
+
+    with app.app_context():
+        assert email_service.mail_configured() is True
+        ok = email_service.send_email("to@example.com", "Hi", "body", "<b>body</b>")
+
+    assert ok is True
+    assert captured["url"] == "https://api.brevo.com/v3/smtp/email"
+    assert captured["headers"]["api-key"] == "key123"
+    assert captured["data"]["to"] == [{"email": "to@example.com"}]
+    assert captured["data"]["subject"] == "Hi"
+    assert captured["data"]["textContent"] == "body"
+    assert captured["data"]["htmlContent"] == "<b>body</b>"
+
+
+def test_send_email_uses_resend_api(monkeypatch):
+    app = create_app("testing")
+    app.config.update(
+        BREVO_API_KEY=None,
+        RESEND_API_KEY="re_123",
+        SMTP_HOST="smtp.should-not-be-used.example.com",
+        MAIL_FROM="bot@example.com",
+        MAIL_FROM_NAME="CWA",
+    )
+
+    captured = {}
+
+    def fake_urlopen(request, timeout=None):
+        captured["url"] = request.full_url
+        captured["headers"] = {k.lower(): v for k, v in request.header_items()}
+        captured["data"] = json.loads(request.data.decode("utf-8"))
+        return _FakeResponse()
+
+    monkeypatch.setattr(email_service.urllib.request, "urlopen", fake_urlopen)
+
+    with app.app_context():
+        ok = email_service.send_email("to@example.com", "Hi", "body")
+
+    assert ok is True
+    assert captured["url"] == "https://api.resend.com/emails"
+    assert captured["headers"]["authorization"] == "Bearer re_123"
+    assert captured["data"]["to"] == ["to@example.com"]
+    assert captured["data"]["subject"] == "Hi"
+    assert "bot@example.com" in captured["data"]["from"]
+
+
+def test_send_email_api_error_raises(monkeypatch):
+    app = create_app("testing")
+    app.config.update(
+        BREVO_API_KEY="bad",
+        RESEND_API_KEY=None,
+        SMTP_HOST=None,
+        MAIL_FROM="bot@example.com",
+    )
+
+    def fake_urlopen(request, timeout=None):
+        raise urllib.error.HTTPError(
+            request.full_url, 401, "Unauthorized", {},
+            io.BytesIO(b'{"message":"bad key"}'),
+        )
+
+    monkeypatch.setattr(email_service.urllib.request, "urlopen", fake_urlopen)
+
+    with app.app_context():
+        with pytest.raises(RuntimeError):
+            email_service.send_email("to@example.com", "Hi", "body")

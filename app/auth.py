@@ -86,8 +86,8 @@ def _verification_flash(status, email):
     elif status == "logged":
         flash(
             "Email delivery isn't set up yet, so the 6-digit code was printed "
-            "to the server console. Configure SMTP_* in your .env to send real "
-            "email.",
+            "to the server console. Configure SMTP or an email API key to send "
+            "real email.",
             "info",
         )
     else:

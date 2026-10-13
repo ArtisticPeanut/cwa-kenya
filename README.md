@@ -161,9 +161,10 @@ cwa_project/
 - **Forgot password** emails a 6-digit one-time code (`OTP_TTL_MINUTES`, default 10
   minutes, `OTP_MAX_ATTEMPTS` tries). Only a hash of the code is stored; codes are
   single-use and a fresh request invalidates earlier ones.
-- With **no SMTP configured** the code is written to the console and the app log,
-  so the flow works in development and demos. Set the `SMTP_*` variables below to
-  send real email.
+- With **no email provider configured** the code is written to the console and the
+  app log, so the flow works in development and demos. Configure either the
+  `SMTP_*` variables or an HTTPS email API key (`BREVO_API_KEY` / `RESEND_API_KEY`)
+  to send real email — see the table below.
 
 ## Admin (reviewers / administrators)
 
@@ -214,6 +215,8 @@ Copy `.env.example` to `.env` and adjust. Key options:
 | `SMTP_USER` / `SMTP_PASSWORD` | SMTP credentials |
 | `SMTP_USE_TLS` | STARTTLS on port 587 (default 1); set 0 for SSL on 465 |
 | `MAIL_FROM` / `MAIL_FROM_NAME` | Sender address and display name |
+| `BREVO_API_KEY` | Optional HTTPS email API (port 443). Use where outbound SMTP is blocked (e.g. Render free plan) |
+| `RESEND_API_KEY` | Optional HTTPS email API alternative; requires a verified sending domain |
 | `OTP_TTL_MINUTES` | Lifetime of sign-up verification & password-reset codes (default 10) |
 | `OTP_MAX_ATTEMPTS` | Wrong-code attempts allowed per code (default 5) |
 
