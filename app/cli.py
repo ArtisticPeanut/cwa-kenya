@@ -1,5 +1,6 @@
 """Flask CLI commands for setup and administration."""
 
+import os
 import re
 
 import click
@@ -16,6 +17,7 @@ def register_cli(app):
     app.cli.add_command(import_csv)
     app.cli.add_command(repair_classification)
     app.cli.add_command(create_user)
+    app.cli.add_command(create_admin)
     app.cli.add_command(migrate_usernames)
     app.cli.add_command(migrate_email_verification)
     app.cli.add_command(export_data)
@@ -85,6 +87,33 @@ def create_user(email, name, username, password, role):
     db.session.add(user)
     db.session.commit()
     click.echo(f"Created {role} account for {email} (username: {username}).")
+
+
+@click.command("create-admin")
+@with_appcontext
+def create_admin():
+    """Create an admin from ADMIN_EMAIL/ADMIN_PASSWORD env vars (idempotent).
+
+    Handy on hosts without shell access (e.g. Render's free plan): set the
+    ADMIN_EMAIL and ADMIN_PASSWORD environment variables, then run this on
+    startup. Does nothing if ADMIN_EMAIL is unset or the account already exists.
+    """
+    email = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
+    password = os.environ.get("ADMIN_PASSWORD") or ""
+    if not email or not password:
+        click.echo("ADMIN_EMAIL/ADMIN_PASSWORD not set; skipping admin bootstrap.")
+        return
+    if User.query.filter(db.func.lower(User.email) == email).first():
+        click.echo(f"An account for {email} already exists; skipping admin bootstrap.")
+        return
+    name = (os.environ.get("ADMIN_NAME") or "").strip() or email.split("@")[0]
+    username = _unique_username(email.split("@")[0])
+    user = User(email=email, username=username, display_name=name, role=ROLE_ADMIN)
+    user.set_password(password)
+    user.mark_email_verified()
+    db.session.add(user)
+    db.session.commit()
+    click.echo(f"Created admin {email} (username: {username}).")
 
 
 @click.command("migrate-usernames")
