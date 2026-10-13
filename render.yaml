@@ -1,0 +1,55 @@
+services:
+  - type: web
+    name: cwa-kenya
+    runtime: python
+    plan: free
+    region: frankfurt
+    branch: master
+    healthCheckPath: /
+    buildCommand: pip install -r requirements.txt
+    startCommand: flask --app wsgi init-db && flask --app wsgi seed && gunicorn --workers 1 --threads 4 --worker-class gthread --bind 0.0.0.0:$PORT wsgi:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.0"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: TRUST_PROXY
+        value: "1"
+      - key: RATELIMIT_STORAGE_URI
+        value: memory://
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_USE_TLS
+        value: "1"
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: Cyber Words Africa
+
+    # --- Optional: keep data across restarts/deploys -----------------------
+    # The free plan has an ephemeral disk, so the SQLite database resets on
+    # every redeploy and whenever the service sleeps. Reference content is
+    # re-seeded on each boot, but user accounts and votes are lost. To persist
+    # them, upgrade the instance (e.g. plan: starter), uncomment the disk below,
+    # and add the DATABASE_URL env var so SQLAlchemy writes to the mounted disk.
+    #
+    # Plan change on line 5:  plan: starter
+    #
+    # disk:
+    #   name: cwa-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    #
+    # Then add ONE entry to the envVars list above:
+    #   - key: DATABASE_URL
+    #     value: sqlite:////var/data/cwa.db
+    #
+    # Note: four slashes (sqlite:////var/data/cwa.db) — three for the scheme,
+    # one for the absolute path. On first boot, init-db creates the tables in
+    # the mounted volume.

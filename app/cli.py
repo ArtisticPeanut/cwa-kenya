@@ -81,6 +81,7 @@ def create_user(email, name, username, password, role):
     username = _unique_username(username or email.split("@")[0])
     user = User(email=email, username=username, display_name=name.strip(), role=role)
     user.set_password(password)
+    user.mark_email_verified()  # CLI operators are trusted — skip email confirmation
     db.session.add(user)
     db.session.commit()
     click.echo(f"Created {role} account for {email} (username: {username}).")
