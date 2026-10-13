@@ -102,6 +102,13 @@ class Config:
     OTP_TTL_MINUTES = int(os.environ.get("OTP_TTL_MINUTES", "10"))
     OTP_MAX_ATTEMPTS = int(os.environ.get("OTP_MAX_ATTEMPTS", "5"))
 
+    # Google Sign-In (OAuth 2.0 / OpenID Connect). Leave both blank to disable:
+    # the "Continue with Google" button is then hidden everywhere. Create
+    # credentials in the Google Cloud Console and add the callback URL
+    # (<APP_URL>/auth/google/callback) to the authorised redirect URIs.
+    GOOGLE_CLIENT_ID = (os.environ.get("GOOGLE_CLIENT_ID") or "").strip() or None
+    GOOGLE_CLIENT_SECRET = (os.environ.get("GOOGLE_CLIENT_SECRET") or "").strip() or None
+
     @staticmethod
     def init_app(app):
         os.makedirs(os.path.join(basedir, "data"), exist_ok=True)

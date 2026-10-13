@@ -1,3 +1,4 @@
+import re
 import time
 from datetime import datetime, timezone
 
@@ -13,7 +14,8 @@ from flask import (
 )
 from flask_login import current_user, login_required, login_user, logout_user
 
-from app.extensions import db, limiter
+from app.extensions import db, limiter, oauth
+from app.oauth import google_oauth_configured
 from app.forms import (
     ForgotPasswordForm,
     LoginForm,
@@ -44,6 +46,22 @@ RESERVED_USERNAMES = {
     "staff", "official", "mimo", "cwa", "help", "security", "me", "you",
 }
 RESEND_COOLDOWN_SECONDS = 60
+
+
+def _unique_username(seed):
+    """Build a safe, unique username from an email local-part or display name."""
+    base = re.sub(r"[^a-z0-9_]", "", (seed or "").lower())[:24]
+    if len(base) < 3:
+        base = (base + "user")[:30]
+    if base in RESERVED_USERNAMES:
+        base = base[:29] + "_"
+    candidate = base
+    suffix = 1
+    while User.username_taken(candidate):
+        suffix += 1
+        tail = str(suffix)
+        candidate = f"{base[: 30 - len(tail)]}{tail}"
+    return candidate
 
 
 def _safe_next(target):
@@ -197,6 +215,96 @@ def login():
         else:
             flash("Invalid username/email or password.", "danger")
     return render_template("auth/login.html", form=form)
+
+
+def _google_userinfo(token):
+    """Return the Google profile from the parsed ID token, falling back to the
+    userinfo endpoint when only an access token is available."""
+    info = token.get("userinfo") or {}
+    if not info:
+        try:
+            info = oauth.google.userinfo(token=token)
+        except Exception:  # noqa: BLE001 - surface a friendly error upstream
+            current_app.logger.exception("Fetching Google userinfo failed")
+            info = {}
+    return info
+
+
+@auth_bp.route("/google")
+@limiter.limit("20 per hour",
+               error_message="Too many sign-in attempts. Please try again later.")
+def google_login():
+    if current_user.is_authenticated:
+        return redirect(url_for("main.home"))
+    if not google_oauth_configured():
+        flash("Google sign-in isn't available right now.", "info")
+        return redirect(url_for("auth.login"))
+    session["oauth_next"] = _safe_next(request.args.get("next"))
+    redirect_uri = url_for("auth.google_callback", _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+
+@auth_bp.route("/google/callback")
+@limiter.limit("30 per hour",
+               error_message="Too many sign-in attempts. Please try again later.")
+def google_callback():
+    if not google_oauth_configured():
+        flash("Google sign-in isn't available right now.", "info")
+        return redirect(url_for("auth.login"))
+    try:
+        token = oauth.google.authorize_access_token()
+    except Exception:  # noqa: BLE001 - bad state / network / revoked consent
+        current_app.logger.exception("Google OAuth callback failed")
+        flash("We couldn't complete Google sign-in. Please try again.", "danger")
+        return redirect(url_for("auth.login"))
+
+    info = _google_userinfo(token)
+    email = (info.get("email") or "").strip().lower()
+    if not email or not info.get("email_verified"):
+        flash(
+            "Google didn't share a verified email, so we can't sign you in. "
+            "Please register with your email instead.",
+            "danger",
+        )
+        return redirect(url_for("auth.login"))
+
+    user = User.query.filter(db.func.lower(User.email) == email).first()
+    created = False
+    if user:
+        if user.is_seed:
+            flash("This is an imported record and cannot be used to sign in.", "warning")
+            return redirect(url_for("auth.login"))
+        if not user.email_verified:
+            user.mark_email_verified()
+    else:
+        display_name = (
+            info.get("name") or info.get("given_name") or email.split("@")[0]
+        ).strip()[:120]
+        user = User(
+            email=email,
+            username=_unique_username(email.split("@")[0]),
+            display_name=display_name or "Google user",
+        )
+        user.mark_email_verified()
+        db.session.add(user)
+        created = True
+
+    user.last_login_at = datetime.now(timezone.utc)
+    db.session.commit()
+    login_user(user)
+
+    next_url = _safe_next(session.pop("oauth_next", None))
+    if next_url:
+        return redirect(next_url)
+    if created:
+        flash(
+            "Karibu! Your account was created with Google. "
+            "You can set a username and county in your profile.",
+            "success",
+        )
+    else:
+        flash(f"Signed in as {user.display_name}.", "success")
+    return redirect(url_for("main.tasks"))
 
 
 @auth_bp.route("/verify", methods=["GET", "POST"])

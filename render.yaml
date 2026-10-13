@@ -44,6 +44,13 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
+      # Google Sign-In (optional). Leave both blank to hide the button; set them
+      # in the Google Cloud Console with redirect URI
+      # https://<your-service>.onrender.com/auth/google/callback
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
 
     # --- Optional: keep data across restarts/deploys -----------------------
     # The free plan has an ephemeral disk, so the SQLite database resets on

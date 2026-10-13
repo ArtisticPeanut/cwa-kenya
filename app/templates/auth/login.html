@@ -10,6 +10,10 @@
     <span class="eyebrow">Sign in</span>
     <h1>Karibu tena</h1>
     <p class="lead">Use your username or email to continue.</p>
+    {% if google_oauth_enabled %}
+      {% include "auth/_google_button.html" %}
+      <div class="auth-or"><span>or</span></div>
+    {% endif %}
     <form method="post" novalidate>
       {{ form.hidden_tag() }}
       <div class="form-row">

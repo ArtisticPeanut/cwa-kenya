@@ -171,6 +171,19 @@ cwa_project/
   app log, so the flow works in development and demos. Configure either the
   `SMTP_*` variables or an HTTPS email API key (`BREVO_API_KEY` / `RESEND_API_KEY`)
   to send real email — see the table below.
+- **Google Sign-In (optional).** Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+  and a "Continue with Google" button appears on the sign-in and registration
+  pages. Google accounts are trusted as verified (no OTP needed); a first-time
+  Google sign-in creates the account with an auto-generated username (editable in
+  the profile), and an existing account with the same email is linked. Setup:
+  1. In the [Google Cloud Console](https://console.cloud.google.com/) create an
+     **OAuth client ID** of type *Web application*.
+  2. Add an authorised redirect URI: `<APP_URL>/auth/google/callback`
+     (e.g. `https://cwa-kenya.onrender.com/auth/google/callback`, and
+     `http://127.0.0.1:5000/auth/google/callback` for local testing).
+  3. Copy the client ID/secret into the env vars above. Locally, also set
+     `OAUTHLIB_INSECURE_TRANSPORT=1` so the HTTP callback is accepted.
+  Leave both blank to keep the button hidden.
 
 ## Admin (reviewers / administrators)
 
@@ -225,6 +238,7 @@ Copy `.env.example` to `.env` and adjust. Key options:
 | `RESEND_API_KEY` | Optional HTTPS email API alternative; requires a verified sending domain |
 | `OTP_TTL_MINUTES` | Lifetime of sign-up verification & password-reset codes (default 10) |
 | `OTP_MAX_ATTEMPTS` | Wrong-code attempts allowed per code (default 5) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Optional Google Sign-In credentials; leave blank to hide the button |
 
 ---
 

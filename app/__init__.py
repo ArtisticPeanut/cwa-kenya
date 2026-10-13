@@ -30,6 +30,10 @@ def create_app(config_name=None):
     csrf.init_app(app)
     limiter.init_app(app)
 
+    from app.oauth import init_oauth
+
+    init_oauth(app)
+
     _register_blueprints(app)
     _register_cli(app)
     _register_jinja(app)
@@ -63,6 +67,7 @@ def _register_jinja(app):
         CATEGORY_LABELS,
     )
     from app.services.recognition import TIER_LABELS
+    from app.oauth import google_oauth_configured
 
     @app.context_processor
     def inject_globals():
@@ -73,6 +78,7 @@ def _register_jinja(app):
             "status_labels": STATUS_LABELS,
             "category_labels": CATEGORY_LABELS,
             "tier_labels": TIER_LABELS,
+            "google_oauth_enabled": google_oauth_configured(),
         }
 
     @app.template_filter("datetime")
