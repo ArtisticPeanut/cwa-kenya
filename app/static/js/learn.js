@@ -113,6 +113,64 @@
     });
   }
 
+  // ---------------------------------------------------------------- audio
+  var SOUNDS = {
+    intro: "/static/audio/mimo-intro.mp3",
+    greeting: "/static/audio/mimo-greeting.mp3"
+  };
+  var muted = false;
+  var greeted = false;
+  var currentAudio = null;
+  var soundBtn = document.getElementById("lmSound");
+  var playBtn = document.getElementById("lmPlay");
+
+  try { muted = localStorage.getItem("mimoMuted") === "1"; } catch (e) { muted = false; }
+
+  function applySoundUi() {
+    if (soundBtn) {
+      soundBtn.textContent = muted ? "🔇" : "🔊";
+      soundBtn.title = muted ? "Sound off" : "Sound on";
+      soundBtn.classList.toggle("is-on", !muted);
+      soundBtn.setAttribute("aria-pressed", muted ? "false" : "true");
+    }
+  }
+
+  function setMuted(value) {
+    muted = value;
+    try { localStorage.setItem("mimoMuted", muted ? "1" : "0"); } catch (e) {}
+    if (muted && currentAudio) currentAudio.pause();
+    applySoundUi();
+  }
+
+  function playSound(name, fallback) {
+    var src = SOUNDS[name];
+    if (!src || muted) return;
+    try {
+      if (currentAudio) currentAudio.pause();
+      var audio = new Audio(src);
+      currentAudio = audio;
+      var usedFallback = false;
+      var start = function () { if (bot) bot.classList.add("is-speaking", "is-talking"); };
+      var stop = function () { if (bot) bot.classList.remove("is-speaking", "is-talking"); };
+      var useFallback = function () {
+        if (fallback && !usedFallback) { usedFallback = true; playSound(fallback); }
+        else { stop(); }
+      };
+      audio.addEventListener("play", start);
+      audio.addEventListener("ended", stop);
+      audio.addEventListener("error", useFallback);
+      var started = audio.play();
+      if (started && started.catch) started.catch(useFallback);
+    } catch (e) { /* audio unsupported — stay silent */ }
+  }
+
+  function greetOnce() {
+    if (greeted) return;
+    greeted = true;
+    // Use the snappy 3-second greeting; fall back to the full intro if absent.
+    playSound("greeting", "intro");
+  }
+
   // ---------------------------------------------------------------- Mimo eyes
   function blink() {
     var eyes = document.querySelectorAll(".lm-eye");
@@ -539,9 +597,30 @@
     if (chatForm) {
       chatForm.addEventListener("submit", function (e) {
         e.preventDefault();
+        greetOnce();
         var value = chatInput ? chatInput.value : "";
         if (chatInput) chatInput.value = "";
         handleUserText(value);
+      });
+    }
+
+    applySoundUi();
+    if (soundBtn) {
+      soundBtn.addEventListener("click", function () { setMuted(!muted); });
+    }
+    if (playBtn) {
+      playBtn.addEventListener("click", function () {
+        if (muted) setMuted(false);
+        if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; }
+        greeted = true;
+        playSound("intro");
+      });
+    }
+    var chatEl = document.getElementById("lmChat");
+    if (chatEl) {
+      chatEl.addEventListener("click", function (e) {
+        if (e.target && e.target.closest && e.target.closest(".lm-chat-tools")) return;
+        greetOnce();
       });
     }
 

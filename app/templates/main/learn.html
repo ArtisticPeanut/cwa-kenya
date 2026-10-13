@@ -30,7 +30,13 @@
         <div class="lm-chat-head">
           <span class="lm-avatar lg">M</span>
           <span class="lm-chat-id"><strong>Mimo</strong><small>online · your safety buddy</small></span>
-          <span class="lm-online" title="online"></span>
+          <span class="lm-chat-tools">
+            <span class="lm-online" title="online"></span>
+            <button class="lm-icon-btn" id="lmPlay" type="button"
+                    title="Hear Mimo say hi" aria-label="Hear Mimo say hi">▶</button>
+            <button class="lm-icon-btn" id="lmSound" type="button"
+                    title="Sound on" aria-label="Toggle sound" aria-pressed="true">🔊</button>
+          </span>
         </div>
         <div class="lm-chat-log" id="lmChatLog" aria-live="polite"></div>
         <div class="lm-chat-replies" id="lmChatReplies"></div>
