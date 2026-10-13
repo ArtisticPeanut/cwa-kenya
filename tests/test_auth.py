@@ -149,3 +149,67 @@ def test_forgot_password_unknown_account_is_generic(app, client):
     assert b"If an account matches" in resp.data
     assert b"No account" not in resp.data
     assert b"not found" not in resp.data
+
+
+def test_login_next_rejects_external_redirect(app, client):
+    _register(client)
+    client.get("/auth/logout")
+    resp = client.post(
+        "/auth/login?next=//evil.example.com",
+        data={"identifier": "amani_w", "password": "strongpass1"},
+    )
+    assert resp.status_code == 302
+    location = resp.headers["Location"]
+    assert "evil.example.com" not in location
+    assert location.endswith("/tasks")
+
+
+def test_login_next_allows_relative_path(app, client):
+    _register(client)
+    client.get("/auth/logout")
+    resp = client.post(
+        "/auth/login?next=/tasks/phishing",
+        data={"identifier": "amani_w", "password": "strongpass1"},
+    )
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/tasks/phishing")
+
+
+def test_production_requires_a_strong_secret_key(monkeypatch):
+    import pytest
+
+    from app import create_app
+
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    with pytest.raises(RuntimeError):
+        create_app("production")
+
+
+def test_production_accepts_a_strong_secret_key(monkeypatch):
+    from app import create_app
+
+    monkeypatch.setenv("SECRET_KEY", "s" * 48)
+    app = create_app("production")
+    assert app.debug is False
+    assert app.config["SESSION_COOKIE_SECURE"] is True
+
+
+def test_login_is_rate_limited(monkeypatch):
+    from app import create_app
+    from app.config import TestingConfig
+    from app.extensions import limiter
+
+    monkeypatch.setattr(TestingConfig, "RATELIMIT_ENABLED", True)
+    app = create_app("testing")
+    with app.app_context():
+        db.create_all()
+    client = app.test_client()
+
+    codes = [
+        client.post(
+            "/auth/login", data={"identifier": "nobody", "password": "wrong"}
+        ).status_code
+        for _ in range(12)
+    ]
+    assert 429 in codes
+    limiter.reset()

@@ -3,7 +3,7 @@ import os
 from flask import Flask, render_template
 
 from app.config import get_config
-from app.extensions import db, login_manager, csrf
+from app.extensions import db, login_manager, csrf, limiter
 
 
 def create_app(config_name=None):
@@ -18,9 +18,17 @@ def create_app(config_name=None):
         if db_path and db_path != ":memory:":
             os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
+    # Behind a reverse proxy, trust one layer of X-Forwarded-* headers so Flask
+    # sees the real client IP (rate limiting) and the correct scheme.
+    if app.config.get("TRUST_PROXY"):
+        from werkzeug.middleware.proxy_fix import ProxyFix
+
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
     db.init_app(app)
     login_manager.init_app(app)
     csrf.init_app(app)
+    limiter.init_app(app)
 
     _register_blueprints(app)
     _register_cli(app)
@@ -97,6 +105,13 @@ def _register_errors(app):
     def not_found(error):
         return render_template("errors/error.html", code=404,
                                message="The page you are looking for was not found."), 404
+
+    @app.errorhandler(429)
+    def too_many_requests(error):
+        message = getattr(error, "description", None) or (
+            "Too many requests. Please slow down and try again shortly."
+        )
+        return render_template("errors/error.html", code=429, message=message), 429
 
     @app.errorhandler(500)
     def server_error(error):

@@ -13,7 +13,7 @@ from flask import (
 )
 from flask_login import current_user, login_required, login_user, logout_user
 
-from app.extensions import db
+from app.extensions import db, limiter
 from app.forms import (
     ForgotPasswordForm,
     LoginForm,
@@ -31,6 +31,15 @@ RESERVED_USERNAMES = {
     "staff", "official", "mimo", "cwa", "help", "security", "me", "you",
 }
 RESEND_COOLDOWN_SECONDS = 60
+
+
+def _safe_next(target):
+    """Only allow same-site, absolute-path redirects (blocks //evil.com)."""
+    if not target or not target.startswith("/"):
+        return None
+    if target.startswith("//") or target.startswith("/\\"):
+        return None
+    return target
 
 
 def county_choices():
@@ -62,6 +71,8 @@ def _populate_choices(form, language_id=None):
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
+@limiter.limit("20 per hour", methods=["POST"],
+               error_message="Too many sign-up attempts. Please try again later.")
 def register():
     if current_user.is_authenticated:
         return redirect(url_for("main.home"))
@@ -97,6 +108,8 @@ def register():
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("10 per minute", methods=["POST"],
+               error_message="Too many sign-in attempts. Please wait a minute and try again.")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("main.home"))
@@ -109,8 +122,8 @@ def login():
             user.last_login_at = datetime.now(timezone.utc)
             db.session.commit()
             login_user(user, remember=form.remember.data)
-            next_url = request.args.get("next")
-            if next_url and next_url.startswith("/"):
+            next_url = _safe_next(request.args.get("next"))
+            if next_url:
                 return redirect(next_url)
             flash(f"Signed in as {user.display_name}.", "success")
             return redirect(url_for("main.tasks"))
@@ -156,6 +169,8 @@ def profile():
 
 
 @auth_bp.route("/forgot", methods=["GET", "POST"])
+@limiter.limit("5 per minute", methods=["POST"],
+               error_message="Too many reset requests. Please wait a minute and try again.")
 def forgot_password():
     if current_user.is_authenticated:
         return redirect(url_for("main.home"))
@@ -194,6 +209,8 @@ def forgot_password():
 
 
 @auth_bp.route("/reset", methods=["GET", "POST"])
+@limiter.limit("10 per minute", methods=["POST"],
+               error_message="Too many attempts. Please wait a minute and try again.")
 def reset_password():
     if current_user.is_authenticated:
         return redirect(url_for("main.home"))

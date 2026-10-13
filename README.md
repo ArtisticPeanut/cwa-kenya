@@ -192,18 +192,60 @@ Copy `.env.example` to `.env` and adjust. Key options:
 
 | Variable | Meaning |
 |---|---|
-| `SECRET_KEY` | Flask session / CSRF secret (set a strong value in production) |
+| `SECRET_KEY` | Flask session / CSRF secret. **Required in production** (≥32 chars, not a placeholder) — the app refuses to boot otherwise. Generate with `python -c "import secrets; print(secrets.token_hex(32))"`. |
+| `FLASK_ENV` | `development` (default), `testing`, or `production` |
 | `DATABASE_URL` | Override SQLite, e.g. `postgresql+psycopg://user:pass@host/db` |
 | `MIN_VOTES_FOR_CONSENSUS` | Assessments required before review (default 3) |
 | `CONSENSUS_RATIO` | Agreement needed to treat a candidate as consensus (default 0.66) |
 | `AMBIGUITY_MARGIN` | Gap below which competitors are treated as ambiguous (default 0.15) |
 | `WTF_CSRF_ENABLED` | Disable CSRF (tests only) |
+| `RATELIMIT_STORAGE_URI` | Rate-limit store; default `memory://`, use `redis://…` with multiple workers |
+| `TRUST_PROXY` | Set `1` behind a reverse proxy so the real client IP / HTTPS is detected |
 | `SMTP_HOST` / `SMTP_PORT` | Mail server (leave blank to log codes to the console) |
 | `SMTP_USER` / `SMTP_PASSWORD` | SMTP credentials |
 | `SMTP_USE_TLS` | STARTTLS on port 587 (default 1); set 0 for SSL on 465 |
 | `MAIL_FROM` / `MAIL_FROM_NAME` | Sender address and display name |
 | `OTP_TTL_MINUTES` | Password-reset code lifetime (default 10) |
 | `OTP_MAX_ATTEMPTS` | Wrong-code attempts allowed per code (default 5) |
+
+---
+
+## Deploying & hosting
+
+The dev runner (`python run.py`) is **not** for production. Use the WSGI
+entrypoint `wsgi.py` (it defaults to the production config):
+
+```powershell
+# Linux / macOS
+gunicorn --workers 4 --bind 0.0.0.0:8000 wsgi:app
+
+# Windows
+waitress-serve --listen=0.0.0.0:8000 wsgi:app
+```
+
+Before you invite users, make sure you have:
+
+1. **A strong `SECRET_KEY`** — the app refuses to start in production without one.
+2. **Debug off** — `wsgi.py` uses `ProductionConfig` (`DEBUG=False`), so the
+   Werkzeug debugger is never exposed. Never serve `run.py` publicly.
+3. **A real database** — set `DATABASE_URL` to PostgreSQL for concurrent traffic
+   (SQLite is fine for development and small demos only).
+4. **HTTPS + a reverse proxy** — terminate TLS at Nginx/Heroku/Render, then set
+   `TRUST_PROXY=1` so client IPs and secure-cookie detection work.
+5. **Shared rate-limit storage** — with more than one worker, set
+   `RATELIMIT_STORAGE_URI` to Redis so login limits are enforced across workers.
+
+### Login & account safety
+
+- Passwords are hashed with Werkzeug (scrypt) and reset codes are hashed too.
+- Sign-in, registration, and password reset are **rate limited** (`10/min` login,
+  `20/hr` register, `5/min` forgot, `10/min` reset) per client IP.
+- The `next=` redirect after sign-in only accepts same-site paths (no open redirect).
+- Reset codes are single-use, expire after `OTP_TTL_MINUTES`, and allow
+  `OTP_MAX_ATTEMPTS` tries before a new code is required.
+- Session and "remember me" cookies are `HttpOnly`, `SameSite=Lax`, and `Secure`
+  in production. CSRF protection is enabled on every form.
+
 
 ---
 

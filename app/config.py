@@ -1,7 +1,27 @@
 import os
 from datetime import timedelta
 
+from dotenv import load_dotenv
+
+# Load a local .env file (if present) for every entrypoint — including WSGI
+# servers, which do not load it the way the Flask CLI does. Real environment
+# variables still take precedence (override defaults to False).
+load_dotenv()
+
 basedir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+
+# Sentinel used in development only. Production refuses to start with this value.
+DEV_SECRET_KEY = "dev-secret-change-me"
+
+# Well-known placeholders that must never be used in production.
+WEAK_SECRET_KEYS = {
+    DEV_SECRET_KEY,
+    "change-me-to-a-long-random-string",
+    "changeme",
+    "secret",
+    "secret-key",
+    "password",
+}
 
 
 def _bool(value, default=False):
@@ -13,7 +33,8 @@ def _bool(value, default=False):
 class Config:
     """Base configuration for the CWA translation platform."""
 
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+    # Resolved from SECRET_KEY at init_app time (see init_app below).
+    SECRET_KEY = None
 
     base_url = os.environ.get("DATABASE_URL")
     if base_url:
@@ -31,9 +52,21 @@ class Config:
     PERMANENT_SESSION_LIFETIME = timedelta(days=14)
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = "Lax"
 
     # CSRF
     WTF_CSRF_ENABLED = _bool(os.environ.get("WTF_CSRF_ENABLED"), True)
+
+    # Rate limiting (Flask-Limiter). Memory storage is fine for a single
+    # process; point RATELIMIT_STORAGE_URI at Redis (e.g. redis://localhost:6379)
+    # when running multiple workers.
+    RATELIMIT_ENABLED = _bool(os.environ.get("RATELIMIT_ENABLED"), True)
+    RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
+    RATELIMIT_HEADERS_ENABLED = True
+    # Trust X-Forwarded-* headers from one reverse proxy (needed so rate
+    # limiting sees the real client IP and HTTPS is detected correctly).
+    TRUST_PROXY = _bool(os.environ.get("TRUST_PROXY"), False)
 
     # App metadata
     APP_NAME = "Kenyan Community-Driven Cybersecurity Translation Platform"
@@ -65,6 +98,11 @@ class Config:
     @staticmethod
     def init_app(app):
         os.makedirs(os.path.join(basedir, "data"), exist_ok=True)
+        # Resolve the signing key now so env changes (and .env) are honoured,
+        # and so production can validate it before the app starts serving.
+        app.config["SECRET_KEY"] = (
+            os.environ.get("SECRET_KEY") or DEV_SECRET_KEY
+        )
 
 
 class DevelopmentConfig(Config):
@@ -74,12 +112,29 @@ class DevelopmentConfig(Config):
 class TestingConfig(Config):
     TESTING = True
     WTF_CSRF_ENABLED = False
+    RATELIMIT_ENABLED = False
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
 
 
 class ProductionConfig(Config):
     DEBUG = False
     SESSION_COOKIE_SECURE = True
+    REMEMBER_COOKIE_SECURE = True
+
+    @staticmethod
+    def init_app(app):
+        Config.init_app(app)
+        secret = app.config.get("SECRET_KEY")
+        if (
+            not secret
+            or secret in WEAK_SECRET_KEYS
+            or len(secret) < 32
+        ):
+            raise RuntimeError(
+                "SECRET_KEY must be set to a unique value of at least 32 "
+                "characters before running in production. Set the SECRET_KEY "
+                "environment variable (see .env.example)."
+            )
 
 
 config = {
