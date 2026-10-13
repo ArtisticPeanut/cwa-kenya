@@ -17,6 +17,7 @@ def test_register_and_login(client, app):
         "/auth/register",
         data={
             "display_name": "Amina Wanjiru",
+            "username": "amina_w",
             "email": "amina@test.ke",
             "password": "supersecret1",
             "confirm": "supersecret1",
@@ -33,7 +34,7 @@ def test_register_and_login(client, app):
 
 def test_submission_requires_meaningful_text(client, app, contributor,
                                              sample_term, sample_language):
-    client.post("/auth/login", data={"email": contributor.email,
+    client.post("/auth/login", data={"identifier": contributor.email,
                                      "password": "supersecret1"})
     client.post(
         f"/tasks/{sample_term.slug}/submit",

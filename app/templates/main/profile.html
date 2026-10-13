@@ -3,8 +3,13 @@
 {% block content %}
 <div class="page-head">
   <div>
+    <span class="eyebrow">Your impact</span>
     <h1>My contributions</h1>
-    <p class="lead">{{ current_user.display_name }} · <span class="badge badge-tier">{{ rank.tier_label }}</span> · reputation {{ rank.reputation }}</p>
+    <p class="lead">
+      {{ current_user.display_name }}
+      {% if current_user.username %}<span class="muted">@{{ current_user.username }}</span>{% endif %}
+      · <span class="badge badge-tier">{{ rank.tier_label }}</span> · reputation {{ rank.reputation }}
+    </p>
   </div>
   <a class="btn btn-ghost" href="{{ url_for('auth.profile') }}">Edit profile</a>
 </div>

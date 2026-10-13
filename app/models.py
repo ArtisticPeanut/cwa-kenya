@@ -8,7 +8,8 @@ The schema is intentionally explicit and auditable:
 * Recognition: milestones and an append-only contributions ledger.
 """
 
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 
 from flask_login import UserMixin
 from sqlalchemy import (
@@ -198,6 +199,7 @@ class User(UserMixin, db.Model):
     __tablename__ = "users"
 
     id = db.Column(Integer, primary_key=True)
+    username = db.Column(String(30), unique=True, nullable=True, index=True)
     email = db.Column(String(255), unique=True, nullable=False, index=True)
     display_name = db.Column(String(120), nullable=False)
     password_hash = db.Column(String(255), nullable=True)
@@ -218,6 +220,9 @@ class User(UserMixin, db.Model):
 
     submissions = relationship("Submission", back_populates="user")
     votes = relationship("Vote", back_populates="user")
+    reset_otps = relationship(
+        "PasswordResetOTP", back_populates="user", cascade="all, delete-orphan"
+    )
 
     # -- helpers ----------------------------------------------------------- #
     def set_password(self, password):
@@ -227,6 +232,33 @@ class User(UserMixin, db.Model):
         if not self.password_hash:
             return False
         return check_password_hash(self.password_hash, password)
+
+    @staticmethod
+    def normalize_username(value):
+        return (value or "").strip().lower()
+
+    @classmethod
+    def find_by_identifier(cls, identifier):
+        """Look up a user by username or email (case-insensitive)."""
+        if not identifier:
+            return None
+        ident = identifier.strip().lower()
+        return cls.query.filter(
+            db.or_(
+                db.func.lower(cls.username) == ident,
+                db.func.lower(cls.email) == ident,
+            )
+        ).first()
+
+    @classmethod
+    def username_taken(cls, username, exclude_id=None):
+        username = cls.normalize_username(username)
+        if not username:
+            return False
+        query = cls.query.filter(db.func.lower(cls.username) == username)
+        if exclude_id is not None:
+            query = query.filter(cls.id != exclude_id)
+        return query.first() is not None
 
     @property
     def is_reviewer(self):
@@ -247,6 +279,69 @@ class User(UserMixin, db.Model):
 
     def __repr__(self):
         return f"<User {self.email} ({self.role})>"
+
+
+class PasswordResetOTP(db.Model):
+    """A one-time code emailed to a user who forgot their password.
+
+    Only a hash of the code is stored. Codes are single-use, expire after a
+    short window, and allow a limited number of verification attempts.
+    """
+
+    __tablename__ = "password_reset_otps"
+
+    id = db.Column(Integer, primary_key=True)
+    user_id = db.Column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )
+    otp_hash = db.Column(String(255), nullable=False)
+    expires_at = db.Column(DateTime, nullable=False)
+    used = db.Column(Boolean, default=False, nullable=False)
+    attempts = db.Column(Integer, default=0, nullable=False)
+    created_at = db.Column(DateTime, default=utcnow, nullable=False)
+
+    user = relationship("User", back_populates="reset_otps")
+
+    @classmethod
+    def issue(cls, user, ttl_minutes=10):
+        """Invalidate outstanding codes and issue a fresh one.
+
+        Returns a (record, plaintext_code) tuple. The plaintext is only
+        available here, to be emailed to the user.
+        """
+        cls.query.filter_by(user_id=user.id, used=False).update({"used": True})
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        record = cls(
+            user_id=user.id,
+            otp_hash=generate_password_hash(code),
+            expires_at=utcnow() + timedelta(minutes=ttl_minutes),
+        )
+        db.session.add(record)
+        return record, code
+
+    @staticmethod
+    def _aware(value):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+
+    def is_expired(self):
+        return self._aware(self.expires_at) < utcnow()
+
+    def verify(self, code, max_attempts=5):
+        """Check a submitted code, consuming an attempt. Marks used on success."""
+        if self.used or self.attempts >= max_attempts or self.is_expired():
+            return False
+        self.attempts += 1
+        if check_password_hash(self.otp_hash, (code or "").strip()):
+            self.used = True
+            return True
+        return False
+
+    def __repr__(self):
+        return f"<PasswordResetOTP user={self.user_id} used={self.used}>"
 
 
 class Submission(db.Model):

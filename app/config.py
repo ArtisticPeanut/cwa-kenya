@@ -49,6 +49,19 @@ class Config:
     JWT_ALGORITHM = "HS256"
     JWT_EXPIRY_HOURS = int(os.environ.get("JWT_EXPIRY_HOURS", 12))
 
+    # Email (SMTP) — falls back to console logging when SMTP_HOST is unset
+    SMTP_HOST = os.environ.get("SMTP_HOST")
+    SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+    SMTP_USER = os.environ.get("SMTP_USER")
+    SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
+    SMTP_USE_TLS = _bool(os.environ.get("SMTP_USE_TLS"), True)
+    MAIL_FROM = os.environ.get("MAIL_FROM") or os.environ.get("SMTP_USER")
+    MAIL_FROM_NAME = os.environ.get("MAIL_FROM_NAME", "Cyber Words Africa")
+
+    # One-time codes for password reset
+    OTP_TTL_MINUTES = int(os.environ.get("OTP_TTL_MINUTES", "10"))
+    OTP_MAX_ATTEMPTS = int(os.environ.get("OTP_MAX_ATTEMPTS", "5"))
+
     @staticmethod
     def init_app(app):
         os.makedirs(os.path.join(basedir, "data"), exist_ok=True)

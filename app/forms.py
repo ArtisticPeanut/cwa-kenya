@@ -7,11 +7,29 @@ from wtforms import (
     SubmitField,
     TextAreaField,
 )
-from wtforms.validators import DataRequired, Email, EqualTo, Length, Optional
+from wtforms.validators import (
+    DataRequired,
+    Email,
+    EqualTo,
+    Length,
+    Optional,
+    Regexp,
+)
+
+USERNAME_RE = r"^[A-Za-z0-9_]+$"
+USERNAME_HELP = "3–30 characters: letters, numbers and underscores only."
 
 
 class RegisterForm(FlaskForm):
     display_name = StringField("Display name", validators=[DataRequired(), Length(2, 120)])
+    username = StringField(
+        "Username",
+        validators=[
+            DataRequired(),
+            Length(3, 30, message="Username must be 3–30 characters."),
+            Regexp(USERNAME_RE, message=USERNAME_HELP),
+        ],
+    )
     email = StringField("Email", validators=[DataRequired(), Email(), Length(max=255)])
     password = PasswordField("Password", validators=[DataRequired(), Length(min=8)])
     confirm = PasswordField(
@@ -30,14 +48,43 @@ class RegisterForm(FlaskForm):
 
 
 class LoginForm(FlaskForm):
-    email = StringField("Email", validators=[DataRequired(), Email()])
+    identifier = StringField("Username or email", validators=[DataRequired()])
     password = PasswordField("Password", validators=[DataRequired()])
     remember = BooleanField("Remember me")
     submit = SubmitField("Sign in")
 
 
+class ForgotPasswordForm(FlaskForm):
+    identifier = StringField("Username or email", validators=[DataRequired()])
+    submit = SubmitField("Send me a code")
+
+
+class ResetPasswordForm(FlaskForm):
+    code = StringField(
+        "Verification code",
+        validators=[DataRequired(), Length(6, 6, message="Enter the 6-digit code.")],
+    )
+    password = PasswordField(
+        "New password",
+        validators=[DataRequired(), Length(min=8, message="Use at least 8 characters.")],
+    )
+    confirm = PasswordField(
+        "Confirm new password",
+        validators=[DataRequired(), EqualTo("password", message="Passwords must match.")],
+    )
+    submit = SubmitField("Set new password")
+
+
 class ProfileForm(FlaskForm):
     display_name = StringField("Display name", validators=[DataRequired(), Length(2, 120)])
+    username = StringField(
+        "Username",
+        validators=[
+            DataRequired(),
+            Length(3, 30, message="Username must be 3–30 characters."),
+            Regexp(USERNAME_RE, message=USERNAME_HELP),
+        ],
+    )
     county_id = SelectField("County (optional)", coerce=int, validators=[Optional()])
     preferred_language_id = SelectField(
         "Preferred language (optional)", coerce=int, validators=[Optional()]

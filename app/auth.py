@@ -1,13 +1,36 @@
+import time
 from datetime import datetime, timezone
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.extensions import db
-from app.forms import LoginForm, ProfileForm, RegisterForm
-from app.models import County, Dialect, Language, User
+from app.forms import (
+    ForgotPasswordForm,
+    LoginForm,
+    ProfileForm,
+    RegisterForm,
+    ResetPasswordForm,
+)
+from app.models import County, Dialect, Language, PasswordResetOTP, User
+from app.services.email import send_password_reset_email
 
 auth_bp = Blueprint("auth", __name__)
+
+RESERVED_USERNAMES = {
+    "admin", "administrator", "root", "system", "support", "moderator",
+    "staff", "official", "mimo", "cwa", "help", "security", "me", "you",
+}
+RESEND_COOLDOWN_SECONDS = 60
 
 
 def county_choices():
@@ -46,11 +69,19 @@ def register():
     _populate_choices(form, request.form.get("preferred_language_id", type=int))
     if form.validate_on_submit():
         email = form.email.data.strip().lower()
+        username = User.normalize_username(form.username.data)
         if User.query.filter(db.func.lower(User.email) == email).first():
             flash("An account with that email already exists.", "danger")
             return render_template("auth/register.html", form=form)
+        if username in RESERVED_USERNAMES:
+            flash("That username is reserved. Please choose another.", "danger")
+            return render_template("auth/register.html", form=form)
+        if User.username_taken(username):
+            flash("That username is already taken. Please choose another.", "danger")
+            return render_template("auth/register.html", form=form)
         user = User(
             email=email,
+            username=username,
             display_name=form.display_name.data.strip(),
             county_id=form.county_id.data or None,
             preferred_language_id=form.preferred_language_id.data or None,
@@ -71,8 +102,7 @@ def login():
         return redirect(url_for("main.home"))
     form = LoginForm()
     if form.validate_on_submit():
-        email = form.email.data.strip().lower()
-        user = User.query.filter(db.func.lower(User.email) == email).first()
+        user = User.find_by_identifier(form.identifier.data)
         if user and user.is_seed:
             flash("This is an imported record and cannot be used to sign in.", "warning")
         elif user and user.check_password(form.password.data):
@@ -85,7 +115,7 @@ def login():
             flash(f"Signed in as {user.display_name}.", "success")
             return redirect(url_for("main.tasks"))
         else:
-            flash("Invalid email or password.", "danger")
+            flash("Invalid username/email or password.", "danger")
     return render_template("auth/login.html", form=form)
 
 
@@ -107,6 +137,14 @@ def profile():
         form.preferred_language_id.data = current_user.preferred_language_id or 0
         form.preferred_dialect_id.data = current_user.preferred_dialect_id or 0
     if form.validate_on_submit():
+        username = User.normalize_username(form.username.data)
+        if username in RESERVED_USERNAMES:
+            flash("That username is reserved. Please choose another.", "danger")
+            return render_template("auth/profile.html", form=form)
+        if User.username_taken(username, exclude_id=current_user.id):
+            flash("That username is already taken. Please choose another.", "danger")
+            return render_template("auth/profile.html", form=form)
+        current_user.username = username
         current_user.display_name = form.display_name.data.strip()
         current_user.county_id = form.county_id.data or None
         current_user.preferred_language_id = form.preferred_language_id.data or None
@@ -115,3 +153,70 @@ def profile():
         flash("Profile updated.", "success")
         return redirect(url_for("auth.profile"))
     return render_template("auth/profile.html", form=form)
+
+
+@auth_bp.route("/forgot", methods=["GET", "POST"])
+def forgot_password():
+    if current_user.is_authenticated:
+        return redirect(url_for("main.home"))
+    form = ForgotPasswordForm()
+    if form.validate_on_submit():
+        user = User.find_by_identifier(form.identifier.data)
+        if user and not user.is_seed and user.password_hash:
+            sent_at = session.get("reset_sent_at")
+            if sent_at and (time.time() - sent_at) < RESEND_COOLDOWN_SECONDS:
+                flash("A code was just sent. Please check your inbox.", "info")
+                return redirect(url_for("auth.reset_password"))
+            record, code = PasswordResetOTP.issue(
+                user, ttl_minutes=current_app.config["OTP_TTL_MINUTES"]
+            )
+            db.session.commit()
+            try:
+                send_password_reset_email(user, code)
+            except Exception:  # noqa: BLE001 - surface a friendly error, keep record
+                current_app.logger.exception("Password reset email failed")
+                flash(
+                    "We could not send the email right now. Please try again shortly.",
+                    "danger",
+                )
+                return render_template("auth/forgot_password.html", form=form)
+            session["reset_uid"] = user.id
+            session["reset_sent_at"] = time.time()
+            flash("We've sent a 6-digit code to the email on that account.", "success")
+            return redirect(url_for("auth.reset_password"))
+        # Generic message avoids revealing whether an account exists.
+        flash(
+            "If an account matches, we've sent a reset code to its email address.",
+            "info",
+        )
+        return render_template("auth/forgot_password.html", form=form)
+    return render_template("auth/forgot_password.html", form=form)
+
+
+@auth_bp.route("/reset", methods=["GET", "POST"])
+def reset_password():
+    if current_user.is_authenticated:
+        return redirect(url_for("main.home"))
+    uid = session.get("reset_uid")
+    user = db.session.get(User, uid) if uid else None
+    if not user:
+        flash("Enter your details to receive a reset code.", "info")
+        return redirect(url_for("auth.forgot_password"))
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        record = (
+            PasswordResetOTP.query.filter_by(user_id=user.id, used=False)
+            .order_by(PasswordResetOTP.created_at.desc())
+            .first()
+        )
+        max_attempts = current_app.config["OTP_MAX_ATTEMPTS"]
+        if record and record.verify(form.code.data, max_attempts=max_attempts):
+            user.set_password(form.password.data)
+            db.session.commit()
+            session.pop("reset_uid", None)
+            session.pop("reset_sent_at", None)
+            flash("Your password has been updated. Please sign in.", "success")
+            return redirect(url_for("auth.login"))
+        db.session.commit()
+        flash("That code is not valid or has expired. Check it and try again.", "danger")
+    return render_template("auth/reset_password.html", form=form, email=user.email)

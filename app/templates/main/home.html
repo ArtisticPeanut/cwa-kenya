@@ -3,14 +3,15 @@
 {% block content %}
 <section class="hero">
   <div>
-    <h1>Cybersecurity awareness should not be limited by the language a person speaks.</h1>
+    <span class="eyebrow">Kenya · community-driven awareness</span>
+    <h1>Cybersecurity awareness should not be limited by <span class="accent">the language a person speaks.</span></h1>
     <p class="lead">
       We work with Kenyan communities to develop, verify and validate cybersecurity
       terminology and awareness messages in the languages and dialects people understand best —
       so that a warning about a scam is understood, not just translated.
     </p>
-    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem;">
-      <a class="btn btn-primary" href="{{ url_for('main.learn') }}">🤖 Meet Mimo & learn</a>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="{{ url_for('main.learn') }}">🤖 Meet Mimo &amp; learn</a>
       <a class="btn btn-ghost" href="{{ url_for('main.select_language') }}">Choose your language</a>
       {% if current_user.is_authenticated %}
         <a class="btn btn-ghost" href="{{ url_for('main.tasks') }}">Start translating</a>
@@ -19,37 +20,41 @@
       {% endif %}
     </div>
   </div>
-  <div class="card">
+  <div class="card card-hover">
     <h3 style="margin-top:0;">The challenge</h3>
     <p class="small muted">A literal translation can sound unnatural, lose meaning, or even cause dangerous misunderstandings. Terms like <em>phishing</em>, <em>malware</em> and <em>identity theft</em> often have no familiar equivalent.</p>
-    <p class="small muted">Our answer: community-developed, peer-verified terminology with linguistic and cybersecurity review.</p>
+    <p class="small muted" style="margin-bottom:0;">Our answer: community-developed, peer-verified terminology with linguistic and cybersecurity review.</p>
   </div>
 </section>
 
-<div class="grid grid-4" style="margin:1.5rem 0;">
-  <div class="card stat"><span class="num">{{ stats.languages }}</span><span class="lbl">Languages &amp; communities</span></div>
-  <div class="card stat"><span class="num">{{ stats.terms }}</span><span class="lbl">Cybersecurity terms &amp; messages</span></div>
-  <div class="card stat"><span class="num">{{ stats.submissions }}</span><span class="lbl">Community submissions</span></div>
-  <div class="card stat"><span class="num">{{ stats.approved }}</span><span class="lbl">Verified translations</span></div>
+<div class="grid grid-4" style="margin:2rem 0;">
+  <div class="stat"><span class="num">{{ stats.languages }}</span><span class="lbl">Languages &amp; communities</span></div>
+  <div class="stat"><span class="num">{{ stats.terms }}</span><span class="lbl">Terms &amp; messages</span></div>
+  <div class="stat"><span class="num">{{ stats.submissions }}</span><span class="lbl">Community submissions</span></div>
+  <div class="stat"><span class="num">{{ stats.approved }}</span><span class="lbl">Verified translations</span></div>
 </div>
 
 <section class="grid grid-3">
-  <div class="card">
-    <h3>1. Choose your language</h3>
-    <p class="small">Pick the language and dialect you understand best. County helps suggest languages, but never decides for you.</p>
+  <div class="card card-hover">
+    <span class="eyebrow">Step 1</span>
+    <h3>Choose your language</h3>
+    <p class="small" style="margin-bottom:0;">Pick the language and dialect you understand best. County helps suggest languages, but never decides for you.</p>
   </div>
-  <div class="card">
-    <h3>2. Translate &amp; explain</h3>
-    <p class="small">Propose translations, explain local usage, and give examples of how a warning would be said naturally.</p>
+  <div class="card card-hover">
+    <span class="eyebrow">Step 2</span>
+    <h3>Translate &amp; explain</h3>
+    <p class="small" style="margin-bottom:0;">Propose translations, explain local usage, and give examples of how a warning would be said naturally.</p>
   </div>
-  <div class="card">
-    <h3>3. Verify together</h3>
-    <p class="small">The community supports or disputes candidates. Reviewers then approve verified translations.</p>
+  <div class="card card-hover">
+    <span class="eyebrow">Step 3</span>
+    <h3>Verify together</h3>
+    <p class="small" style="margin-bottom:0;">The community supports or disputes candidates. Reviewers then approve verified translations.</p>
   </div>
 </section>
 
-<section class="card" style="margin-top:1.5rem;">
-  <h2 style="margin-top:0;">Languages being documented</h2>
+<section class="card section">
+  <span class="eyebrow">Coverage</span>
+  <h2 style="margin-top:.3rem;">Languages being documented</h2>
   <div class="pill-list">
     {% for lang in languages %}
       <a class="pill" href="{{ url_for('main.set_language', language_id=lang.id) }}">{{ lang.name }}</a>

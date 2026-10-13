@@ -1,44 +1,60 @@
 {% extends "base.html" %}
 {% block title %}Join · {{ app_short_name }}{% endblock %}
 {% block content %}
-<div class="card" style="max-width:640px;margin:1rem auto;">
-  <h1>Become a contributor</h1>
-  <p class="muted">Help make cybersecurity understandable in the language people speak.</p>
-  <form method="post" novalidate>
-    {{ form.hidden_tag() }}
-    <div class="form-grid">
-      <div class="form-row">
-        {{ form.display_name.label }}
-        {{ form.display_name() }}
-        {% for e in form.display_name.errors %}<p class="errors">{{ e }}</p>{% endfor %}
-      </div>
-      <div class="form-row">
-        {{ form.email.label }}
-        {{ form.email() }}
-        {% for e in form.email.errors %}<p class="errors">{{ e }}</p>{% endfor %}
-      </div>
-      <div class="form-row">
-        {{ form.password.label }}
-        {{ form.password() }}
-        {% for e in form.password.errors %}<p class="errors">{{ e }}</p>{% endfor %}
-      </div>
-      <div class="form-row">
-        {{ form.confirm.label }}
-        {{ form.confirm() }}
-        {% for e in form.confirm.errors %}<p class="errors">{{ e }}</p>{% endfor %}
-      </div>
-    </div>
-    <fieldset style="margin-top:1rem;">
-      <legend>Where are you from?</legend>
-      <p class="small muted" style="margin-top:0;">County information only helps suggest relevant languages. It never determines the language you may choose.</p>
+<div class="auth-shell">
+  {% set aside_title = "Add your language to the conversation." %}
+  {% set aside_text = "Every term you translate helps someone recognise a scam before it costs them." %}
+  {% include "auth/_aside.html" %}
+
+  <div class="auth-card">
+    <span class="eyebrow">Create account</span>
+    <h1>Become a contributor</h1>
+    <p class="lead">Help make cybersecurity understandable in the language people speak.</p>
+    <form method="post" novalidate>
+      {{ form.hidden_tag() }}
       <div class="form-grid">
-        <div class="form-row">{{ form.county_id.label }}{{ form.county_id() }}</div>
-        <div class="form-row">{{ form.preferred_language_id.label }}{{ form.preferred_language_id() }}</div>
-        <div class="form-row">{{ form.preferred_dialect_id.label }}{{ form.preferred_dialect_id() }}</div>
+        <div class="form-row">
+          {{ form.display_name.label }}
+          {{ form.display_name(placeholder="e.g. Amani Wanjiru") }}
+          {% for e in form.display_name.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+        </div>
+        <div class="form-row">
+          {{ form.username.label }}
+          {{ form.username(placeholder="amani_w", autocomplete="username") }}
+          <p class="hint">Letters, numbers and underscores. You'll use this to sign in.</p>
+          {% for e in form.username.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+        </div>
+        <div class="form-row">
+          {{ form.email.label }}
+          {{ form.email(placeholder="you@example.com", autocomplete="email") }}
+          {% for e in form.email.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+        </div>
+        <div class="form-row">
+          {{ form.password.label }}
+          {{ form.password(autocomplete="new-password") }}
+          {% for e in form.password.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+        </div>
+        <div class="form-row">
+          {{ form.confirm.label }}
+          {{ form.confirm(autocomplete="new-password") }}
+          {% for e in form.confirm.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+        </div>
       </div>
-    </fieldset>
-    <label class="checkbox">{{ form.consent() }} {{ form.consent.label.text }}</label>
-    {{ form.submit(class_="btn btn-primary btn-block", style="margin-top:1rem;") }}
-  </form>
+
+      <fieldset>
+        <legend>Where are you from?</legend>
+        <p class="hint" style="margin-top:0;">County information only helps suggest relevant languages. It never determines the language you may choose.</p>
+        <div class="form-grid">
+          <div class="form-row">{{ form.county_id.label }}{{ form.county_id() }}</div>
+          <div class="form-row">{{ form.preferred_language_id.label }}{{ form.preferred_language_id(data_language_select="1") }}</div>
+          <div class="form-row">{{ form.preferred_dialect_id.label }}{{ form.preferred_dialect_id(data_dialect_select="1") }}</div>
+        </div>
+      </fieldset>
+
+      <label class="checkbox">{{ form.consent() }} {{ form.consent.label.text }}</label>
+      {{ form.submit(class_="btn btn-primary btn-block", style="margin-top:1.1rem;") }}
+    </form>
+    <p class="auth-alts">Already have an account? <a href="{{ url_for('auth.login') }}">Sign in</a></p>
+  </div>
 </div>
 {% endblock %}

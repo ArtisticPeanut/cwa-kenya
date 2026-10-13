@@ -20,11 +20,19 @@ python scripts\bootstrap.py
 
 # 3. Create your first administrator (interactive)
 $env:FLASK_APP = "run.py"
-flask create-user      # role defaults to "admin"
+flask create-user      # role defaults to "admin"; derive a username automatically
+flask create-user --username billy --role admin
 
 # 4. Run the app
 python run.py          # http://127.0.0.1:5000
 ```
+
+> Upgrading an existing database? Add the `username` column and backfill it from
+> each account's email:
+>
+> ```powershell
+> flask migrate-usernames
+> ```
 
 To import a different responses file:
 
@@ -110,6 +118,7 @@ cwa_project/
 | Path | Purpose |
 |---|---|
 | `/` | Home & project overview |
+| `/learn` | Mimo — the friendly chatbot learning experience |
 | `/languages` | Language / dialect / county selection |
 | `/tasks` | Translation tasks for the selected language |
 | `/tasks/<term>` | Translate, explain and assess candidates |
@@ -119,6 +128,21 @@ cwa_project/
 | `/me` | Your submissions, milestones and reputation |
 | `/downloads` | Open data (JSON / CSV) |
 | `/about` | Project vision and principles |
+| `/auth/login` | Sign in with a username **or** email |
+| `/auth/register` | Create a contributor account |
+| `/auth/forgot` | Request a one-time reset code by email |
+| `/auth/reset` | Enter the code and choose a new password |
+
+## Accounts & password reset
+
+- Every account has a unique **username** (3–30 letters, numbers or underscores).
+  Sign in with either the username or the email address.
+- **Forgot password** emails a 6-digit one-time code (`OTP_TTL_MINUTES`, default 10
+  minutes, `OTP_MAX_ATTEMPTS` tries). Only a hash of the code is stored; codes are
+  single-use and a fresh request invalidates earlier ones.
+- With **no SMTP configured** the code is written to the console and the app log,
+  so the flow works in development and demos. Set the `SMTP_*` variables below to
+  send real email.
 
 ## Admin (reviewers / administrators)
 
@@ -162,6 +186,12 @@ Copy `.env.example` to `.env` and adjust. Key options:
 | `CONSENSUS_RATIO` | Agreement needed to treat a candidate as consensus (default 0.66) |
 | `AMBIGUITY_MARGIN` | Gap below which competitors are treated as ambiguous (default 0.15) |
 | `WTF_CSRF_ENABLED` | Disable CSRF (tests only) |
+| `SMTP_HOST` / `SMTP_PORT` | Mail server (leave blank to log codes to the console) |
+| `SMTP_USER` / `SMTP_PASSWORD` | SMTP credentials |
+| `SMTP_USE_TLS` | STARTTLS on port 587 (default 1); set 0 for SSL on 465 |
+| `MAIL_FROM` / `MAIL_FROM_NAME` | Sender address and display name |
+| `OTP_TTL_MINUTES` | Password-reset code lifetime (default 10) |
+| `OTP_MAX_ATTEMPTS` | Wrong-code attempts allowed per code (default 5) |
 
 ---
 
