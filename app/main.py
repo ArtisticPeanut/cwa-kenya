@@ -193,20 +193,21 @@ def task_detail(slug):
         (d.id, f"{d.name} ({d.language.name})")
         for d in Dialect.query.order_by(Dialect.name).all()
     ]
+    dialect_id = dialect.id if dialect else None
     if language:
         form.language_id.data = language.id
-        form.dialect_id.data = dialect.id if dialect else 0
+        form.dialect_id.data = dialect_id or 0
 
     ranked = (
-        consensus.rank_candidates(term.id, language.id, dialect.id)
+        consensus.rank_candidates(term.id, language.id, dialect_id)
         if language else []
     )
     scope = (
-        consensus.scope_consensus(term.id, language.id, dialect.id)
+        consensus.scope_consensus(term.id, language.id, dialect_id)
         if language else None
     )
     canonical = (
-        consensus.canonical_for(term.id, language.id, dialect.id)
+        consensus.canonical_for(term.id, language.id, dialect_id)
         if language else None
     )
     my_votes = {}

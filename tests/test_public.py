@@ -10,6 +10,15 @@ def test_unknown_term_returns_404(client):
     assert client.get("/tasks/does-not-exist").status_code == 404
 
 
+def test_task_detail_with_language_but_no_dialect(app, client):
+    from app.models import Language
+
+    lang = Language.query.filter_by(name="Dholuo").first()
+    client.get(f"/languages/set/{lang.id}")  # selects language, no dialect
+    resp = client.get("/tasks/phishing")
+    assert resp.status_code == 200
+
+
 def test_select_language_sets_session(client):
     from app.models import Language
 
