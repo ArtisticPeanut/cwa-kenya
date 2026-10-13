@@ -205,36 +205,57 @@ def login():
 def verify_email():
     if current_user.is_authenticated:
         return redirect(url_for("main.home"))
-    uid = session.get("verify_uid")
-    user = db.session.get(User, uid) if uid else None
-    if not user:
-        flash("Create an account first, then confirm your email.", "info")
-        return redirect(url_for("auth.register"))
-    if user.email_verified:
-        flash("Your email is already confirmed. Please sign in.", "info")
-        return redirect(url_for("auth.login"))
 
     form = VerifyEmailForm()
     resend_form = ResendVerificationForm()
-    if form.validate_on_submit():
-        record = (
-            EmailVerificationOTP.query.filter_by(user_id=user.id, used=False)
-            .order_by(EmailVerificationOTP.created_at.desc())
-            .first()
+
+    # Identify the account from the session when we have it (fresh sign-up or an
+    # unverified sign-in attempt); otherwise the visitor types their email, so
+    # the page still works after the session/browser/device is lost.
+    uid = session.get("verify_uid")
+    session_user = db.session.get(User, uid) if uid else None
+    if request.method == "GET":
+        form.email.data = (
+            session_user.email if session_user else (request.args.get("email") or "")
         )
-        max_attempts = current_app.config["OTP_MAX_ATTEMPTS"]
-        if record and record.verify(form.code.data, max_attempts=max_attempts):
-            user.mark_email_verified()
+    elif not form.email.data:
+        if session_user:
+            form.email.data = session_user.email
+
+    if form.validate_on_submit():
+        email = form.email.data.strip().lower()
+        user = User.query.filter(db.func.lower(User.email) == email).first()
+        if user and user.is_seed:
+            flash("This is an imported record and cannot be used to sign in.", "warning")
+        elif user and user.email_verified:
+            flash("Your email is already confirmed. Please sign in.", "info")
+            return redirect(url_for("auth.login"))
+        elif user:
+            record = (
+                EmailVerificationOTP.query.filter_by(user_id=user.id, used=False)
+                .order_by(EmailVerificationOTP.created_at.desc())
+                .first()
+            )
+            max_attempts = current_app.config["OTP_MAX_ATTEMPTS"]
+            if record and record.verify(form.code.data, max_attempts=max_attempts):
+                user.mark_email_verified()
+                db.session.commit()
+                session.pop("verify_uid", None)
+                session.pop("verify_sent_at", None)
+                login_user(user)
+                flash("Email confirmed — karibu aboard!", "success")
+                return redirect(url_for("main.tasks"))
             db.session.commit()
-            session.pop("verify_uid", None)
-            session.pop("verify_sent_at", None)
-            login_user(user)
-            flash("Email confirmed — karibu aboard!", "success")
-            return redirect(url_for("main.tasks"))
-        db.session.commit()
-        flash("That code is not valid or has expired. Check it and try again.", "danger")
+            flash("That code is not valid or has expired. Check it and try again.", "danger")
+        else:
+            # Don't reveal whether an account exists for the address.
+            flash("That code is not valid or has expired. Check it and try again.", "danger")
+
     return render_template(
-        "auth/verify_email.html", form=form, resend_form=resend_form, email=user.email
+        "auth/verify_email.html",
+        form=form,
+        resend_form=resend_form,
+        email=form.email.data,
     )
 
 
@@ -247,23 +268,32 @@ def resend_verification():
     resend_form = ResendVerificationForm()
     if not resend_form.validate_on_submit():
         return redirect(url_for("auth.verify_email"))
-    uid = session.get("verify_uid")
-    user = db.session.get(User, uid) if uid else None
-    if not user:
-        flash("Create an account first, then confirm your email.", "info")
-        return redirect(url_for("auth.register"))
-    if user.email_verified:
-        flash("Your email is already confirmed. Please sign in.", "info")
-        return redirect(url_for("auth.login"))
-    sent_at = session.get("verify_sent_at")
-    if sent_at and (time.time() - sent_at) < RESEND_COOLDOWN_SECONDS:
+    email = resend_form.email.data.strip().lower()
+    user = User.query.filter(db.func.lower(User.email) == email).first()
+    if not user or user.is_seed or user.email_verified:
+        # Generic response so we don't reveal whether the account exists.
+        flash("If that account needs confirmation, we've sent a fresh code.", "info")
+        return redirect(url_for("auth.verify_email", email=email))
+
+    # Cooldown is based on the most recent code, so it still applies even when
+    # the original session was lost.
+    latest = (
+        EmailVerificationOTP.query.filter_by(user_id=user.id)
+        .order_by(EmailVerificationOTP.created_at.desc())
+        .first()
+    )
+    if latest and latest.created_at and (
+        datetime.now(timezone.utc) - EmailVerificationOTP._aware(latest.created_at)
+    ).total_seconds() < RESEND_COOLDOWN_SECONDS:
         flash("A code was just sent. Please check your inbox.", "info")
-        return redirect(url_for("auth.verify_email"))
+        return redirect(url_for("auth.verify_email", email=user.email))
+
     sent = _issue_verification(user)
     db.session.commit()
+    session["verify_uid"] = user.id
     session["verify_sent_at"] = time.time()
     _verification_flash(sent, user.email)
-    return redirect(url_for("auth.verify_email"))
+    return redirect(url_for("auth.verify_email", email=user.email))
 
 
 @auth_bp.route("/logout")

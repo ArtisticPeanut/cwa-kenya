@@ -55,6 +55,7 @@
       {{ form.submit(class_="btn btn-primary btn-block", style="margin-top:1.1rem;") }}
     </form>
     <p class="auth-alts">Already have an account? <a href="{{ url_for('auth.login') }}">Sign in</a></p>
+    <p class="auth-alts">Have a confirmation code? <a href="{{ url_for('auth.verify_email') }}">Verify your email</a></p>
   </div>
 </div>
 {% endblock %}

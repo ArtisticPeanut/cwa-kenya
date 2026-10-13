@@ -158,7 +158,10 @@ cwa_project/
 - **Email verification at sign-up.** Registering sends a 6-digit code; the account
   stays inactive and **cannot sign in until the code is confirmed** at `/auth/verify`.
   A "Resend code" button issues a fresh code (60-second cooldown) and invalidates
-  the previous one.
+  the previous one. Verification is **self-contained**: the page accepts the email
+  plus the code, so a user who lost their session, closed the tab or switched
+  device can still confirm (reachable from a "Verify your email" link on the sign-in
+  and registration pages).
 - Accounts that already existed before verification was introduced are marked
   verified by `flask migrate-email-verification`, so nobody is locked out.
 - **Forgot password** emails a 6-digit one-time code (`OTP_TTL_MINUTES`, default 10

@@ -29,6 +29,7 @@
       {{ form.submit(class_="btn btn-primary btn-block", style="margin-top:1rem;") }}
     </form>
     <p class="auth-alts">New here? <a href="{{ url_for('auth.register') }}">Join the community</a></p>
+    <p class="auth-alts">Have a code to confirm? <a href="{{ url_for('auth.verify_email') }}">Verify your email</a></p>
   </div>
 </div>
 {% endblock %}

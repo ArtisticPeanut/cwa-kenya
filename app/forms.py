@@ -76,6 +76,9 @@ class ResetPasswordForm(FlaskForm):
 
 
 class VerifyEmailForm(FlaskForm):
+    email = StringField(
+        "Email", validators=[DataRequired(), Email(), Length(max=255)]
+    )
     code = StringField(
         "Verification code",
         validators=[DataRequired(), Length(6, 6, message="Enter the 6-digit code.")],
@@ -84,6 +87,9 @@ class VerifyEmailForm(FlaskForm):
 
 
 class ResendVerificationForm(FlaskForm):
+    email = StringField(
+        "Email", validators=[DataRequired(), Email(), Length(max=255)]
+    )
     submit = SubmitField("Resend code")
 
 

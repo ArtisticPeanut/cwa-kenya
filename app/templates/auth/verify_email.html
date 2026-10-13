@@ -9,21 +9,34 @@
   <div class="auth-card">
     <span class="eyebrow">Email verification</span>
     <h1>Confirm your email</h1>
-    <p class="lead">We sent a 6-digit code to <strong>{{ email }}</strong>. It expires in {{ config.OTP_TTL_MINUTES }} minutes.</p>
+    <p class="lead">
+      {% if email %}
+        We sent a 6-digit code to <strong>{{ email }}</strong>. It expires in {{ config.OTP_TTL_MINUTES }} minutes.
+      {% else %}
+        Enter your email and the 6-digit code we sent you. The code expires in {{ config.OTP_TTL_MINUTES }} minutes.
+      {% endif %}
+    </p>
     <form method="post" novalidate>
       {{ form.hidden_tag() }}
+      <div class="form-row">
+        {{ form.email.label }}
+        {{ form.email(placeholder="you@example.com", inputmode="email", autocomplete="email",
+                      autofocus=(not email)) }}
+        {% for e in form.email.errors %}<p class="errors">{{ e }}</p>{% endfor %}
+      </div>
       <div class="form-row otp-field">
         {{ form.code.label }}
-        {{ form.code(placeholder="000000", inputmode="numeric", autocomplete="one-time-code", maxlength="6", autofocus=true) }}
+        {{ form.code(placeholder="000000", inputmode="numeric", autocomplete="one-time-code",
+                     maxlength="6", autofocus=email) }}
         {% for e in form.code.errors %}<p class="errors">{{ e }}</p>{% endfor %}
       </div>
       {{ form.submit(class_="btn btn-primary btn-block", style="margin-top:1rem;") }}
-    </form>
 
-    <form method="post" action="{{ url_for('auth.resend_verification') }}" class="auth-resend">
-      {{ resend_form.hidden_tag() }}
-      <span>Didn't get it?</span>
-      {{ resend_form.submit(class_="btn btn-ghost btn-sm") }}
+      <div class="auth-resend">
+        <span>Didn't get it?</span>
+        <button type="submit" class="btn btn-ghost btn-sm"
+                formaction="{{ url_for('auth.resend_verification') }}">Resend code</button>
+      </div>
     </form>
 
     <div class="auth-links">

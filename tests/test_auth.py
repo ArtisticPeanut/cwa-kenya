@@ -261,7 +261,9 @@ def test_register_requires_email_verification(app, client, monkeypatch):
     assert page.status_code == 200
 
     done = client.post(
-        "/auth/verify", data={"code": captured["code"]}, follow_redirects=True
+        "/auth/verify",
+        data={"email": "amani@example.ke", "code": captured["code"]},
+        follow_redirects=True,
     )
     assert b"Email confirmed" in done.data
     user = User.query.filter_by(email="amani@example.ke").first()
@@ -269,11 +271,49 @@ def test_register_requires_email_verification(app, client, monkeypatch):
     assert user.email_verified_at is not None
 
 
+def test_verify_works_without_session(app, client, monkeypatch):
+    """A lost session must not strand the user: email + code still verifies."""
+    captured = _capture_verification(monkeypatch)
+    _register(client)
+    with client.session_transaction() as sess:
+        sess.clear()
+
+    page = client.get("/auth/verify")
+    assert page.status_code == 200
+    assert b"Enter your email" in page.data
+
+    done = client.post(
+        "/auth/verify",
+        data={"email": "amani@example.ke", "code": captured["code"]},
+        follow_redirects=True,
+    )
+    assert b"Email confirmed" in done.data
+    assert User.query.filter_by(email="amani@example.ke").first().email_verified is True
+
+
+def test_resend_works_without_session(app, client, monkeypatch):
+    captured = _capture_verification(monkeypatch)
+    _register(client)
+    first_code = captured["code"]
+    with client.session_transaction() as sess:
+        sess.clear()
+
+    resp = client.post(
+        "/auth/verify/resend",
+        data={"email": "amani@example.ke"},
+        follow_redirects=True,
+    )
+    assert b"just sent" in resp.data
+    assert captured["code"] == first_code
+
+
 def test_verify_rejects_wrong_code(app, client, monkeypatch):
     _capture_verification(monkeypatch)
     _register(client)
     resp = client.post(
-        "/auth/verify", data={"code": "000000"}, follow_redirects=True
+        "/auth/verify",
+        data={"email": "amani@example.ke", "code": "000000"},
+        follow_redirects=True,
     )
     assert b"not valid or has expired" in resp.data
     user = User.query.filter_by(email="amani@example.ke").first()
@@ -284,7 +324,11 @@ def test_verification_resend_has_cooldown(app, client, monkeypatch):
     captured = _capture_verification(monkeypatch)
     _register(client)
     first_code = captured["code"]
-    resp = client.post("/auth/verify/resend", data={}, follow_redirects=True)
+    resp = client.post(
+        "/auth/verify/resend",
+        data={"email": "amani@example.ke"},
+        follow_redirects=True,
+    )
     assert b"just sent" in resp.data
     # The cooldown prevents a fresh code from being issued immediately.
     assert captured["code"] == first_code
