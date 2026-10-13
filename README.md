@@ -90,6 +90,9 @@ cwa_project/
 ├── pytest.ini
 ├── scripts/
 │   └── bootstrap.py           # create tables + seed + import (one command)
+├── data/
+│   └── seed/
+│       └── submissions.csv    # anonymized responses (emails -> @import.local)
 ├── app/
 │   ├── __init__.py            # app factory, blueprints, error handlers, filters
 │   ├── config.py              # dev / testing / production config
@@ -277,6 +280,13 @@ Before you invite users, make sure you have:
 Imported Google Forms responses create *seed contributors* (no password, cannot
 sign in) so real samples participate in community verification without exposing
 anyone's login.
+
+The committed `data/seed/submissions.csv` is an **anonymized** copy of the source
+responses: contributor emails are replaced with `<handle>@import.local` (the
+handle keeps the display name), so the sample dataset can ship in the repo and be
+loaded with `flask import-csv data/seed/submissions.csv`. The original responses
+CSV (with real emails) stays out of git. Deployments re-run the import on each
+boot because the free-plan database is ephemeral.
 
 ---
 
