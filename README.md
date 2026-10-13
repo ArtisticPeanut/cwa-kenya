@@ -133,6 +133,18 @@ cwa_project/
 | `/auth/forgot` | Request a one-time reset code by email |
 | `/auth/reset` | Enter the code and choose a new password |
 
+## Learning with Mimo
+
+- `/learn` is Mimo's chat playground: pick a language, then ask for a 🛡️ safety
+  tip, 📖 a word, or a 🎯 quiz.
+- Once a language is chosen, Mimo can also **speak a specific dialect** (pills
+  under the language row, with the current pick shown as a chip in the chat
+  header). Words, quizzes and tips then prefer content tagged with that dialect,
+  falling back to the whole language when the community has none. Your choice is
+  remembered per language in the browser.
+- The dialect switcher only appears for languages that actually have
+  dialect-tagged content, and it never changes the site-wide selected language.
+
 ## Accounts & password reset
 
 - Every account has a unique **username** (3–30 letters, numbers or underscores).

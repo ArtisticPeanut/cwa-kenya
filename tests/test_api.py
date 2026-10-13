@@ -19,8 +19,10 @@ def test_stats_endpoint_for_learners(client):
     assert totals["languages"] >= 20
     # every language carries the fields the learners UI reads
     for lang in data["languages"]:
-        for key in ["name", "native_name", "submissions", "approved", "contributors"]:
+        for key in ["name", "native_name", "submissions", "approved",
+                    "contributors", "dialect_count", "dialects"]:
             assert key in lang
+        assert isinstance(lang["dialects"], list)
 
 
 def test_translations_empty_until_approved(client):

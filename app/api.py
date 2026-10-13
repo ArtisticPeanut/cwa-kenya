@@ -78,17 +78,48 @@ def stats():
         .group_by(Submission.language_id)
         .all()
     )
+    sub_by_dialect = dict(
+        db.session.query(Submission.dialect_id, func.count(Submission.id))
+        .filter(Submission.dialect_id.isnot(None))
+        .group_by(Submission.dialect_id)
+        .all()
+    )
+    approved_by_dialect = dict(
+        db.session.query(
+            CanonicalTranslation.dialect_id, func.count(CanonicalTranslation.id)
+        )
+        .filter(
+            CanonicalTranslation.dialect_id.isnot(None),
+            CanonicalTranslation.status == CANON_APPROVED,
+        )
+        .group_by(CanonicalTranslation.dialect_id)
+        .all()
+    )
 
     languages = []
     for lang in Language.query.filter_by(is_active=True).order_by(Language.name).all():
         submissions = sub_by_lang.get(lang.id, 0)
         approved = approved_by_lang.get(lang.id, 0)
+        dialects = []
+        for dialect in sorted(lang.dialects, key=lambda d: d.name):
+            d_submissions = sub_by_dialect.get(dialect.id, 0)
+            d_approved = approved_by_dialect.get(dialect.id, 0)
+            if d_submissions or d_approved:
+                dialects.append(
+                    {
+                        "id": dialect.id,
+                        "name": dialect.name,
+                        "submissions": d_submissions,
+                        "approved": d_approved,
+                    }
+                )
         languages.append(
             {
                 "id": lang.id,
                 "name": lang.name,
                 "native_name": lang.native_name,
                 "dialect_count": len(lang.dialects),
+                "dialects": dialects,
                 "submissions": submissions,
                 "approved": approved,
                 "contributors": contrib_by_lang.get(lang.id, 0),

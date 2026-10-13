@@ -11,12 +11,14 @@
   var barsBox = document.getElementById("lmBars");
   var quizBox = document.getElementById("lmQuiz");
   var quizSection = document.getElementById("lmQuizSection");
+  var dialectBox = document.getElementById("lmDialects");
+  var speakChip = document.getElementById("lmSpeakChip");
   var chatLog = document.getElementById("lmChatLog");
   var chatReplies = document.getElementById("lmChatReplies");
   var chatForm = document.getElementById("lmChatForm");
   var chatInput = document.getElementById("lmChatInput");
 
-  var state = { totals: null, languages: [], selected: null,
+  var state = { totals: null, languages: [], selected: null, selectedDialect: null,
     quiz: { correct: 0, total: 0, streak: 0 } };
   var talkTimer = null;
   var happyTimer = null;
@@ -239,6 +241,83 @@
     return null;
   }
 
+  // ---------------------------------------------------- Mimo's dialect
+  // Mimo can "speak" a specific dialect when the community has content for it,
+  // falling back to the whole language. Remembered per language in the browser.
+  var dialectStore = {};
+  try { dialectStore = JSON.parse(localStorage.getItem("mimoDialects") || "{}") || {}; }
+  catch (e) { dialectStore = {}; }
+
+  function rememberDialect(lang, dialect) {
+    var key = String(lang.id);
+    if (dialect) dialectStore[key] = dialect.id;
+    else delete dialectStore[key];
+    try { localStorage.setItem("mimoDialects", JSON.stringify(dialectStore)); } catch (e) {}
+  }
+
+  function rememberedDialect(lang) {
+    var wanted = dialectStore[String(lang.id)];
+    if (!wanted) return null;
+    return (lang.dialects || []).filter(function (d) {
+      return d.id === wanted || String(d.id) === String(wanted);
+    })[0] || null;
+  }
+
+  function dialectQuery() {
+    return state.selectedDialect
+      ? "&dialect=" + encodeURIComponent(state.selectedDialect.name)
+      : "";
+  }
+
+  function langLabel(lang) {
+    lang = lang || state.selected;
+    if (!lang) return "";
+    return lang.name + (state.selectedDialect ? " · " + state.selectedDialect.name : "");
+  }
+
+  function updateSpeakChip() {
+    if (!speakChip) return;
+    if (!state.selected) { speakChip.hidden = true; return; }
+    speakChip.hidden = false;
+    speakChip.textContent = "🎙️ " + langLabel(state.selected);
+  }
+
+  function renderDialects(lang) {
+    if (!dialectBox) return;
+    var dialects = lang ? (lang.dialects || []) : [];
+    if (!dialects.length) {
+      dialectBox.hidden = true;
+      dialectBox.innerHTML = "";
+      return;
+    }
+    dialectBox.hidden = false;
+    dialectBox.innerHTML = "";
+    var all = [{ id: null, name: "Community-wide" }].concat(dialects);
+    all.forEach(function (d) {
+      var current = state.selectedDialect ? state.selectedDialect.id : null;
+      var active = current === d.id || String(current) === String(d.id);
+      var pill = el('<button type="button" class="lm-dialect' +
+        (active ? " is-active" : "") + '">' + esc(d.name) + "</button>");
+      pill.addEventListener("click", function () {
+        setDialect(lang, d.id === null ? null : d);
+      });
+      dialectBox.appendChild(pill);
+    });
+  }
+
+  function setDialect(lang, dialect) {
+    state.selectedDialect = dialect;
+    rememberDialect(lang, dialect);
+    renderDialects(lang);
+    updateSpeakChip();
+    mimoSay(dialect
+      ? "Sawa! I'll speak " + lang.name + " · " + dialect.name + " now. 🎙️"
+      : "Back to community-wide " + lang.name + ". 🌍");
+    loadWord(lang);
+    startQuiz(lang);
+    sendAwarenessTip(lang);
+  }
+
   // ------------------------------------------------------------- render
   function renderStats(totals) {
     if (!statsBox) return;
@@ -324,13 +403,13 @@
   // ---------------------------------------------------- word of the moment
   function loadWord(lang) {
     if (!wordBox) return;
-    wordBox.innerHTML = '<p class="lm-loading">Mimo is fetching a ' + esc(lang.name) + " word…</p>";
-    fetch("/learn/word?language=" + encodeURIComponent(lang.name) + "&category=glossary")
+    wordBox.innerHTML = '<p class="lm-loading">Mimo is fetching a ' + esc(langLabel(lang)) + " word…</p>";
+    fetch("/learn/word?language=" + encodeURIComponent(lang.name) + dialectQuery() + "&category=glossary")
       .then(function (r) { return r.ok ? r.json() : { available: false }; })
       .then(function (data) {
         if (!data.available) {
           wordBox.innerHTML =
-            '<div class="lm-word"><span class="lm-term">' + esc(lang.name) + "</span>" +
+            '<div class="lm-word"><span class="lm-term">' + esc(langLabel(lang)) + "</span>" +
             '<div class="lm-trans">Be the first to teach Mimo a word! 🌱</div>' +
             '<div class="lm-def">No words for this language yet — ' +
             lang.submissions + " community samples are waiting for review.</div>" +
@@ -347,7 +426,7 @@
   function showWord(w, lang) {
     wordBox.innerHTML =
       '<div class="lm-word">' +
-        '<span class="lm-term">' + esc(w.term) + " · " + esc(lang.name) + "</span>" +
+        '<span class="lm-term">' + esc(w.term) + " · " + esc(langLabel(lang)) + "</span>" +
         '<div class="lm-trans">' + esc(w.translation) + "</div>" +
         '<div class="lm-def">' + esc(w.definition || "A cybersecurity word to know.") + "</div>" +
         '<span class="lm-badge">' + (w.verified ? "✓ community verified" : "🌱 community sample") + "</span>" +
@@ -358,13 +437,13 @@
   function chips() {
     return '<span class="lm-chip">⭐ Score ' + state.quiz.correct + "/" + state.quiz.total + "</span>" +
       '<span class="lm-chip">🔥 Streak ' + state.quiz.streak + "</span>" +
-      (state.selected ? '<span class="lm-chip">🌍 ' + esc(state.selected.name) + "</span>" : "");
+      (state.selected ? '<span class="lm-chip">🌍 ' + esc(langLabel()) + "</span>" : "");
   }
 
   function startQuiz(lang) {
     if (!quizBox) return;
     quizBox.innerHTML = '<p class="lm-loading">Mimo is thinking of a question…</p>';
-    fetch("/learn/quiz?language=" + encodeURIComponent(lang.name))
+    fetch("/learn/quiz?language=" + encodeURIComponent(lang.name) + dialectQuery())
       .then(function (r) { return r.ok ? r.json() : { available: false, reason: "error" }; })
       .then(function (data) {
         if (!data.available) { renderQuizUnavailable(data, lang); return; }
@@ -388,7 +467,8 @@
     quizBox.innerHTML =
       '<div class="lm-quiz-head"><span class="lm-chips">' + chips() + "</span></div>" +
       '<div class="lm-question">Which one means <span class="lm-qterm">' + esc(q.term) +
-        "</span> in " + esc(data.language) + "?</div>" +
+        "</span> in " + esc(data.language) +
+        (data.dialect ? " · " + esc(data.dialect) : "") + "?</div>" +
       '<div class="lm-qdef">' + esc(q.definition || "") + "</div>" +
       '<div class="lm-options" id="lmOptions"></div>' +
       '<div class="lm-feedback" id="lmFeedback"></div>' +
@@ -456,8 +536,11 @@
 
   function chooseLanguage(lang) {
     state.selected = lang;
+    state.selectedDialect = rememberedDialect(lang);
     highlightPills(lang);
-    mimoSay("Sasa tunaanza " + lang.name + "! 🎉 I'm learning with " + lang.contributors +
+    renderDialects(lang);
+    updateSpeakChip();
+    mimoSay("Sasa tunaanza " + langLabel(lang) + "! 🎉 I'm learning with " + lang.contributors +
       " friend" + (lang.contributors === 1 ? "" : "s") + " and " + lang.submissions +
       " words so far.");
     state.quiz = { correct: 0, total: 0, streak: 0 };
@@ -497,11 +580,11 @@
   }
 
   function sendAwarenessTip(lang) {
-    fetch("/learn/word?language=" + encodeURIComponent(lang.name) + "&category=message")
+    fetch("/learn/word?language=" + encodeURIComponent(lang.name) + dialectQuery() + "&category=message")
       .then(function (r) { return r.ok ? r.json() : { available: false }; })
       .then(function (data) {
         if (!data.available) {
-          mimoSay("I don't have a safety tip in " + lang.name + " yet. Help us add one! 🌱");
+          mimoSay("I don't have a safety tip in " + langLabel(lang) + " yet. Help us add one! 🌱");
         } else {
           var w = data.word;
           var text = "🛡️ " + w.translation;
@@ -519,15 +602,15 @@
   }
 
   function sendWord(lang) {
-    fetch("/learn/word?language=" + encodeURIComponent(lang.name) + "&category=glossary")
+    fetch("/learn/word?language=" + encodeURIComponent(lang.name) + dialectQuery() + "&category=glossary")
       .then(function (r) { return r.ok ? r.json() : { available: false }; })
       .then(function (data) {
         if (!data.available) {
-          mimoSay("I don't know a word in " + lang.name + " yet — will you teach me one? 🌱");
+          mimoSay("I don't know a word in " + langLabel(lang) + " yet — will you teach me one? 🌱");
           return;
         }
         var w = data.word;
-        var text = "📖 “" + w.term + "” in " + lang.name + " is “" + w.translation + "”.";
+        var text = "📖 “" + w.term + "” in " + langLabel(lang) + " is “" + w.translation + "”.";
         if (w.definition) text += "\n" + w.definition;
         if (!w.verified) text += "\n🌱 community sample";
         mimoSay(text);

@@ -361,18 +361,34 @@ def learn():
     return render_template("main/learn.html")
 
 
-def _translation_pool(language_id):
+def _translation_pool(language_id, dialect_id=None):
     """Best available translation text per term for one language.
 
-    Prefers community-verified canonicals; otherwise falls back to the
-    leading *consented* community sample. This keeps the quiz honest: it never
-    uses a sample that was not shared for public awareness use.
+    Mimo prefers verified canonicals over community samples, and — within each
+    — the *chosen dialect* first, then generic (untagged) language-wide content,
+    then other dialects of the same language. This keeps the quiz honest (it
+    never uses a sample that was not shared for public awareness use) while
+    letting Mimo "speak" a specific dialect when the community has content for
+    it, and gracefully fall back to language-wide otherwise.
     """
-    pool = {}
+    # term_id -> (priority, payload); higher priority wins.
+    best = {}
+
+    def consider(term_id, priority, payload):
+        current = best.get(term_id)
+        if current is None or priority > current[0]:
+            best[term_id] = (priority, payload)
+
     for canon in CanonicalTranslation.query.filter_by(
         language_id=language_id, status=CANON_APPROVED
     ).all():
-        pool[canon.term_id] = {"text": canon.text, "term": canon.term, "verified": True}
+        payload = {"text": canon.text, "term": canon.term, "verified": True}
+        if canon.dialect_id is None:
+            consider(canon.term_id, 5, payload)  # generic verified
+        elif dialect_id is not None and canon.dialect_id == dialect_id:
+            consider(canon.term_id, 6, payload)  # chosen-dialect verified
+        else:
+            consider(canon.term_id, 4, payload)  # other-dialect verified
 
     subs = (
         Submission.query.filter_by(language_id=language_id, consent_public=True)
@@ -393,13 +409,43 @@ def _translation_pool(language_id):
             if implied and implied != sub.language_id:
                 continue
         by_term.setdefault(sub.term_id, []).append(sub)
-    for term_id, items in by_term.items():
-        if term_id in pool:
-            continue
+
+    def best_sample(items):
         items.sort(key=lambda s: (s.support_count, -s.id), reverse=True)
-        best = items[0]
-        pool[term_id] = {"text": best.text, "term": best.term, "verified": False}
-    return pool
+        return {"text": items[0].text, "term": items[0].term, "verified": False}
+
+    for term_id, items in by_term.items():
+        chosen = [s for s in items if dialect_id is not None and s.dialect_id == dialect_id]
+        generic = [s for s in items if s.dialect_id is None]
+        other = [s for s in items if s.dialect_id is not None and s not in chosen]
+        if chosen:
+            consider(term_id, 3, best_sample(chosen))   # chosen-dialect sample
+        if generic:
+            consider(term_id, 2, best_sample(generic))  # generic language-wide
+        if other:
+            consider(term_id, 1, best_sample(other))    # another dialect
+
+    return {term_id: payload for term_id, (_p, payload) in best.items()}
+
+
+def _dialect_from_request(language):
+    """Resolve the optional ?dialect= (name) or ?dialect_id= for a language."""
+    if language is None:
+        return None
+    name = request.args.get("dialect")
+    if name:
+        dialect = Dialect.query.filter(
+            db.func.lower(Dialect.name) == name.strip().lower(),
+            Dialect.language_id == language.id,
+        ).first()
+        if dialect:
+            return dialect
+    dialect_id = request.args.get("dialect_id", type=int)
+    if dialect_id is not None:
+        dialect = db.session.get(Dialect, dialect_id)
+        if dialect and dialect.language_id == language.id:
+            return dialect
+    return None
 
 
 def _language_from_request():
@@ -423,8 +469,9 @@ def learn_quiz():
     language = _language_from_request()
     if language is None:
         return jsonify({"available": False, "reason": "unknown_language"}), 404
+    dialect = _dialect_from_request(language)
 
-    pool = _translation_pool(language.id)
+    pool = _translation_pool(language.id, dialect.id if dialect else None)
     entries = [
         {"text": v["text"], "term": v["term"], "verified": v["verified"]}
         for v in pool.values() if v["text"] and v["text"].strip()
@@ -434,6 +481,7 @@ def learn_quiz():
             {
                 "available": False,
                 "language": language.name,
+                "dialect": dialect.name if dialect else None,
                 "reason": "not_enough_words",
                 "have": len(entries),
             }
@@ -453,6 +501,7 @@ def learn_quiz():
         {
             "available": True,
             "language": language.name,
+            "dialect": dialect.name if dialect else None,
             "question": {
                 "term": correct["term"].english_name,
                 "term_slug": correct["term"].slug,
@@ -474,12 +523,13 @@ def learn_word():
     language = _language_from_request()
     if language is None:
         return jsonify({"available": False, "reason": "unknown_language"}), 404
+    dialect = _dialect_from_request(language)
 
     category = (request.args.get("category") or "").strip().lower()
     exclude = {s for s in (request.args.get("exclude") or "").split(",") if s}
     entries = [
         value
-        for value in _translation_pool(language.id).values()
+        for value in _translation_pool(language.id, dialect.id if dialect else None).values()
         if value["text"].strip()
         and (not category or value["term"].category == category)
         and value["term"].slug not in exclude
@@ -489,6 +539,7 @@ def learn_word():
             {
                 "available": False,
                 "language": language.name,
+                "dialect": dialect.name if dialect else None,
                 "reason": "not_enough_words",
             }
         )
@@ -499,6 +550,7 @@ def learn_word():
         {
             "available": True,
             "language": language.name,
+            "dialect": dialect.name if dialect else None,
             "word": {
                 "term": term.english_name,
                 "slug": term.slug,

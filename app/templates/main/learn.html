@@ -30,6 +30,7 @@
         <div class="lm-chat-head">
           <span class="lm-avatar lg">M</span>
           <span class="lm-chat-id"><strong>Mimo</strong><small>online · your safety buddy</small></span>
+          <span class="lm-speak-chip" id="lmSpeakChip" hidden></span>
           <span class="lm-chat-tools">
             <span class="lm-online" title="online"></span>
             <button class="lm-icon-btn" id="lmPlay" type="button"
@@ -51,10 +52,11 @@
 
   <section class="lm-section">
     <h2>1 · Choose a language</h2>
-    <p class="lm-hint">These are the communities already learning with us. Tap one to meet its words.</p>
+    <p class="lm-hint">These are the communities already learning with us. Tap one to meet its words — then fine-tune the dialect Mimo speaks below.</p>
     <div class="lm-pills" id="lmLanguages">
       <span class="lm-loading">Waking Mimo up…</span>
     </div>
+    <div class="lm-dialects" id="lmDialects" hidden></div>
   </section>
 
   <section class="lm-section">

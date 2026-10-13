@@ -86,3 +86,84 @@ def test_learn_word_serves_consented_sample(app, client, contributor):
     assert messages.get_json()["available"] is False
 
     assert client.get("/learn/word?language=Klingon").status_code == 404
+
+
+def test_stats_reports_dialects_with_content(app, client, contributor):
+    from app.extensions import db
+    from app.models import Dialect, Language, STATUS_CANDIDATE, Submission, Term
+
+    lang = Language.query.filter_by(name="Kikuyu").first()
+    kabete = Dialect.query.filter_by(language_id=lang.id, name="Kabete").first()
+    term = Term.query.filter_by(slug="phishing").first()
+    db.session.add(Submission(
+        term_id=term.id, language_id=lang.id, dialect_id=kabete.id,
+        user_id=contributor.id, text="kikuyu-kabete-phishing",
+        status=STATUS_CANDIDATE, consent_public=True,
+    ))
+    db.session.commit()
+
+    data = client.get("/api/v1/stats").get_json()
+    kikuyu = next(l for l in data["languages"] if l["name"] == "Kikuyu")
+    by_name = {d["name"]: d for d in kikuyu["dialects"]}
+    assert "Kabete" in by_name
+    assert by_name["Kabete"]["submissions"] >= 1
+
+
+def test_learn_word_prefers_dialect_then_falls_back(app, client, contributor):
+    from app.extensions import db
+    from app.models import Dialect, Language, STATUS_CANDIDATE, Submission, Term
+
+    lang = Language.query.filter_by(name="Kikuyu").first()
+    kabete = Dialect.query.filter_by(language_id=lang.id, name="Kabete").first()
+    term = Term.query.filter_by(slug="phishing").first()
+    db.session.add(Submission(
+        term_id=term.id, language_id=lang.id, dialect_id=None,
+        user_id=contributor.id, text="kikuyu-generic-phishing",
+        status=STATUS_CANDIDATE, consent_public=True,
+    ))
+    db.session.add(Submission(
+        term_id=term.id, language_id=lang.id, dialect_id=kabete.id,
+        user_id=contributor.id, text="kikuyu-kabete-phishing",
+        status=STATUS_CANDIDATE, consent_public=True,
+    ))
+    db.session.commit()
+
+    picked = client.get(
+        "/learn/word?language=Kikuyu&category=glossary&dialect=Kabete"
+    ).get_json()
+    assert picked["dialect"] == "Kabete"
+    assert picked["word"]["translation"] == "kikuyu-kabete-phishing"
+
+    # a dialect with no content falls back to the generic language-wide sample
+    fallback = client.get(
+        "/learn/word?language=Kikuyu&category=glossary&dialect=Mathira"
+    ).get_json()
+    assert fallback["dialect"] == "Mathira"
+    assert fallback["word"]["translation"] == "kikuyu-generic-phishing"
+
+    # an unknown dialect name is ignored, keeping the language-wide sample
+    unknown = client.get(
+        "/learn/word?language=Kikuyu&category=glossary&dialect=Nonexistent"
+    ).get_json()
+    assert unknown["dialect"] is None
+    assert unknown["word"]["translation"] == "kikuyu-generic-phishing"
+
+
+def test_learn_quiz_reports_selected_dialect(app, client, contributor):
+    from app.extensions import db
+    from app.models import Dialect, Language, STATUS_CANDIDATE, Submission, Term
+
+    lang = Language.query.filter_by(name="Kikuyu").first()
+    kabete = Dialect.query.filter_by(language_id=lang.id, name="Kabete").first()
+    for i, term in enumerate(Term.query.limit(4).all()):
+        db.session.add(Submission(
+            term_id=term.id, language_id=lang.id, dialect_id=kabete.id,
+            user_id=contributor.id, text=f"kabete-word-{i}",
+            status=STATUS_CANDIDATE, consent_public=True,
+        ))
+    db.session.commit()
+
+    data = client.get("/learn/quiz?language=Kikuyu&dialect=Kabete").get_json()
+    assert data["available"] is True
+    assert data["dialect"] == "Kabete"
+
