@@ -93,13 +93,13 @@ h3 { font-size: 1.1rem; font-weight: 700; }
 .brand:hover { text-decoration: none; }
 .brand-mark {
   display: grid; place-items: center;
-  width: auto; height: 48px;
+  width: auto; height: 64px;
   border-radius: 13px;
   box-shadow: none;
   overflow: hidden;
 }
 .brand-mark img {
-  display: block; height: 48px; width: auto; max-width: none;
+  display: block; height: 64px; width: auto; max-width: none;
 }
 .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
 .brand-text strong { font-weight: 800; letter-spacing: -.01em; }
