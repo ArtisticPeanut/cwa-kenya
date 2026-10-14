@@ -13,3 +13,4 @@ instance/
 # Raw form responses contain contributor email addresses (PII) — keep out of git
 *Responses*.csv
 *Form responses*.csv
+/Cyber Words Africa Mimo Logo.png

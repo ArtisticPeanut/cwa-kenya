@@ -92,10 +92,14 @@ h3 { font-size: 1.1rem; font-weight: 700; }
 .brand { display: flex; align-items: center; gap: .7rem; color: var(--ink); }
 .brand:hover { text-decoration: none; }
 .brand-mark {
-  display: grid; place-items: center; width: 42px; height: 42px;
-  background: var(--grad); color: #fff; font-weight: 800; border-radius: 13px;
-  letter-spacing: .04em; box-shadow: 0 8px 18px rgba(79, 70, 229, .35);
-  transform: rotate(-4deg);
+  display: grid; place-items: center;
+  width: auto; height: 42px;
+  border-radius: 13px;
+  box-shadow: none;
+  overflow: hidden;
+}
+.brand-mark img {
+  display: block; height: 42px; width: auto; max-width: none;
 }
 .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
 .brand-text strong { font-weight: 800; letter-spacing: -.01em; }

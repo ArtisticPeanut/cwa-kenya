@@ -8,6 +8,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32.png') }}">
+  <link rel="icon" type="image/png" sizes="128x128" href="{{ url_for('static', filename='img/favicon-128.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   {% block head %}{% endblock %}
 </head>
@@ -15,10 +18,8 @@
 <header class="site-header">
   <div class="container header-inner">
     <a class="brand" href="{{ url_for('main.home') }}">
-      <span class="brand-mark">CWA</span>
-      <span class="brand-text">
-        <strong>Cyber Words Africa</strong>
-        <small>Kenya translation &amp; awareness</small>
+      <span class="brand-mark">
+        <img src="{{ url_for('static', filename='img/cwa-logo.png') }}" alt="Cyber Words Africa logo" width="640" height="400">
       </span>
     </a>
     <button class="nav-toggle" aria-label="Toggle navigation" onclick="document.body.classList.toggle('nav-open')">☰</button>
