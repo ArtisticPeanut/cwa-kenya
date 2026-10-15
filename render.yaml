@@ -69,8 +69,7 @@ services:
         sizeGB: 1
     #
     # Then add ONE entry to the envVars list above:
-        - key: DATABASE_URL
-        value: sqlite:////var/data/cwa.db
+
     #
     # Note: four slashes (sqlite:////var/data/cwa.db) — three for the scheme,
     # one for the absolute path. On first boot, init-db creates the tables in
