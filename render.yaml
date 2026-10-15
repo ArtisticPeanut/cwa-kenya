@@ -2,7 +2,7 @@ services:
   - type: web
     name: cwa-kenya
     runtime: python
-    plan: free
+    plan: starter
     region: frankfurt
     branch: master
     healthCheckPath: /
@@ -44,6 +44,8 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
+      - key: DATABASE_URL
+        value: sqlite:////var/data/cwa.db
       # Google Sign-In (optional). Leave both blank to hide the button; set them
       # in the Google Cloud Console with redirect URI
       # https://<your-service>.onrender.com/auth/google/callback
@@ -61,14 +63,14 @@ services:
     #
     # Plan change on line 5:  plan: starter
     #
-    # disk:
-    #   name: cwa-data
-    #   mountPath: /var/data
-    #   sizeGB: 1
+      disk:
+        name: cwa-data
+        mountPath: /var/data
+        sizeGB: 1
     #
     # Then add ONE entry to the envVars list above:
-    #   - key: DATABASE_URL
-    #     value: sqlite:////var/data/cwa.db
+        - key: DATABASE_URL
+        value: sqlite:////var/data/cwa.db
     #
     # Note: four slashes (sqlite:////var/data/cwa.db) — three for the scheme,
     # one for the absolute path. On first boot, init-db creates the tables in
